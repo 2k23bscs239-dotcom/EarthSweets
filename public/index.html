@@ -1,0 +1,1826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EarthSweet — Pure Gur, Shakar & Sugarcane</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&family=DM+Sans:wght@300;400;500;600&family=Noto+Nastaliq+Urdu:wght@400;700&display=swap" rel="stylesheet">
+<!-- Firebase SDKs -->
+<!-- Facebook SDK — separate script tag (must NOT be inside Firebase module) -->
+<script>
+  window.fbAsyncInit = function() {
+    FB.init({
+      appId      : '{your-app-id}',
+      cookie     : true,
+      xfbml      : true,
+      version    : '{api-version}'
+    });
+    FB.AppEvents.logPageView();
+  };
+  (function(d, s, id){
+    var js, fjs = d.getElementsByTagName(s)[0];
+    if (d.getElementById(id)) { return; }
+    js = d.createElement(s); js.id = id;
+    js.src = "https://connect.facebook.net/en_US/sdk.js";
+    fjs.parentNode.insertBefore(js, fjs);
+  }(document, 'script', 'facebook-jssdk'));
+</script>
+
+<!-- Firebase SDK -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
+  import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyCYN7KXzJTCHUMQGUccnm88WHz4epDbWjk",
+    authDomain: "earthsweet-846f7.firebaseapp.com",
+    projectId: "earthsweet-846f7",
+    storageBucket: "earthsweet-846f7.firebasestorage.app",
+    messagingSenderId: "1090473568526",
+    appId: "1:1090473568526:web:1ddfc7cd2750356845cf5f"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const googleProvider = new GoogleAuthProvider();
+  const facebookProvider = new FacebookAuthProvider();
+
+  function handleUser(user) {
+    if (!user) return;
+    // Save to backend DB
+    fetch(window.API_URL + '/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: user.email, full_name: user.displayName || user.email })
+    }).then(r => r.json()).then(data => {
+      if (data.success) {
+        window.currentToken = data.data.token;
+        window.currentUser = data.data.customer;
+        localStorage.setItem('es_token', data.data.token);
+        localStorage.setItem('es_user', JSON.stringify(data.data.customer));
+      }
+    }).catch(() => {
+      // Backend not available — use Firebase data only
+      window.currentUser = { full_name: user.displayName || user.email, phone: '', email: user.email };
+      localStorage.setItem('es_user', JSON.stringify(window.currentUser));
+    });
+    document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('open'));
+    if (window.updateNavUser) window.updateNavUser();
+    const t = document.getElementById('toast');
+    if (t) {
+      t.textContent = '✅ Welcome, ' + (user.displayName || user.email) + '!';
+      t.classList.add('show');
+      setTimeout(() => t.classList.remove('show'), 4000);
+    }
+  }
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      window.currentUser = { full_name: user.displayName || user.email, phone: '', email: user.email };
+      localStorage.setItem('es_user', JSON.stringify(window.currentUser));
+    }
+    setTimeout(() => { if (window.updateNavUser) window.updateNavUser(); }, 400);
+  });
+
+  window.signInWithGoogle = async function() {
+    try {
+      const result = await signInWithPopup(auth, googleProvider);
+      handleUser(result.user);
+    } catch(e) {
+      if (e.code === 'auth/popup-blocked') {
+        const t = document.getElementById('toast');
+        if (t) { t.textContent = '⚠️ Popup blocked! Browser settings mein allow karo.'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),5000); }
+      } else if (e.code !== 'auth/popup-closed-by-user') {
+        console.error('Google login error:', e.code, e.message);
+        const t = document.getElementById('toast');
+        if (t) { t.textContent = '❌ ' + e.message; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),5000); }
+      }
+    }
+  };
+
+  window.signInWithFacebook = async function() {
+    try {
+      const result = await signInWithPopup(auth, facebookProvider);
+      handleUser(result.user);
+    } catch(e) {
+      if (e.code !== 'auth/popup-closed-by-user') {
+        console.error('Facebook login error:', e.code, e.message);
+      }
+    }
+  };
+
+  window.firebaseSignOut = async function() {
+    try { await signOut(auth); } catch(e) { console.warn(e); }
+  };
+</script>
+<style>
+/* ===== RESET & BASE ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; font-size: 16px; }
+body {
+  font-family: 'DM Sans', sans-serif;
+  background: #fff;
+  color: #1a1a1a;
+  overflow-x: hidden;
+}
+
+:root {
+  --green: #2d6a4f;
+  --green-light: #40916c;
+  --green-pale: #d8f3dc;
+  --amber: #e9c46a;
+  --amber-dark: #c9a227;
+  --brown: #6b3e26;
+  --cream: #fdf8ee;
+  --cream2: #f5f0e0;
+  --white: #ffffff;
+  --dark: #0f2318;
+  --gray: #6b7280;
+  --light: #f9fafb;
+  --shadow: 0 4px 24px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 48px rgba(0,0,0,0.14);
+  --radius: 16px;
+  --radius-sm: 8px;
+}
+
+/* ===== LOADER ===== */
+#loader {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--dark);
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.5s ease;
+}
+#loader.hidden { opacity: 0; pointer-events: none; }
+.loader-inner { text-align: center; }
+.loader-logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.5rem; font-weight: 700;
+  color: var(--amber);
+  margin-bottom: 20px;
+  letter-spacing: 0.05em;
+}
+.loader-bar {
+  width: 200px; height: 3px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 99px; overflow: hidden;
+  margin: 0 auto;
+}
+.loader-fill {
+  height: 100%;
+  background: var(--amber);
+  border-radius: 99px;
+  animation: loadfill 1.5s ease forwards;
+}
+@keyframes loadfill { from { width: 0; } to { width: 100%; } }
+
+/* ===== NAVBAR ===== */
+nav {
+  position: fixed; top: 0; width: 100%; z-index: 500;
+  background: rgba(15,35,24,0.96);
+  backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(233,196,106,0.2);
+  height: 68px;
+}
+.nav-container {
+  max-width: 1280px; margin: 0 auto; padding: 0 32px;
+  height: 100%; display: flex; align-items: center; gap: 32px;
+}
+.nav-logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.5rem; font-weight: 700;
+  color: var(--amber);
+  text-decoration: none;
+  display: flex; align-items: center; gap: 8px;
+  white-space: nowrap;
+}
+.logo-leaf { font-size: 1.2rem; }
+.nav-links {
+  list-style: none; display: flex; gap: 28px;
+  margin-left: auto;
+}
+.nav-links a {
+  color: rgba(255,255,255,0.8); text-decoration: none;
+  font-size: 0.9rem; font-weight: 500;
+  letter-spacing: 0.03em;
+  transition: color 0.2s;
+}
+.nav-links a:hover { color: var(--amber); }
+.nav-actions { display: flex; align-items: center; gap: 12px; }
+.lang-toggle {
+  font-family: 'Noto Nastaliq Urdu', serif;
+  background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2);
+  color: white; padding: 6px 14px; border-radius: 99px;
+  cursor: pointer; font-size: 0.85rem; transition: all 0.2s;
+}
+.lang-toggle:hover { background: rgba(233,196,106,0.2); border-color: var(--amber); }
+.btn-login {
+  background: transparent; border: 1px solid rgba(255,255,255,0.3);
+  color: white; padding: 8px 18px; border-radius: 99px;
+  cursor: pointer; font-size: 0.85rem; font-weight: 500;
+  transition: all 0.2s;
+}
+.btn-login:hover { border-color: var(--amber); color: var(--amber); }
+.btn-logout {
+  background: rgba(231,76,60,0.15); border: 1px solid rgba(231,76,60,0.4);
+  color: #e74c3c; padding: 8px 16px; border-radius: 99px;
+  cursor: pointer; font-size: 0.82rem; font-weight: 600;
+  transition: all 0.2s; display: none;
+}
+.btn-logout:hover { background: #e74c3c; color: white; border-color: #e74c3c; }
+.btn-order {
+  background: var(--amber); border: none;
+  color: var(--dark); padding: 9px 20px; border-radius: 99px;
+  cursor: pointer; font-size: 0.85rem; font-weight: 600;
+  transition: all 0.2s;
+}
+.btn-order:hover { background: var(--amber-dark); transform: translateY(-1px); }
+.hamburger { display: none; flex-direction: column; gap: 5px; cursor: pointer; }
+.hamburger span { width: 24px; height: 2px; background: white; border-radius: 2px; transition: all 0.3s; }
+
+/* ===== MOBILE MENU ===== */
+.mobile-menu {
+  display: none; position: fixed;
+  top: 68px; left: 0; right: 0; z-index: 490;
+  background: var(--dark);
+  padding: 24px 32px;
+  border-bottom: 1px solid rgba(233,196,106,0.2);
+}
+.mobile-menu.open { display: block; }
+.mobile-menu ul { list-style: none; }
+.mobile-menu li { border-bottom: 1px solid rgba(255,255,255,0.08); }
+.mobile-menu a {
+  display: block; padding: 14px 0;
+  color: rgba(255,255,255,0.85); text-decoration: none;
+  font-size: 1rem; font-weight: 500;
+}
+
+/* ===== CONTAINER ===== */
+.container { max-width: 1280px; margin: 0 auto; padding: 0 32px; }
+
+/* ===== HERO ===== */
+.hero {
+  min-height: 100vh;
+  background: var(--dark);
+  display: flex; align-items: center;
+  padding: 100px 32px 60px;
+  position: relative; overflow: hidden;
+}
+.hero-bg {
+  position: absolute; inset: 0; pointer-events: none;
+}
+.hero-pattern {
+  position: absolute; inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 50%, rgba(45,106,79,0.3) 0%, transparent 50%),
+    radial-gradient(circle at 80% 20%, rgba(233,196,106,0.15) 0%, transparent 40%),
+    radial-gradient(circle at 60% 80%, rgba(45,106,79,0.2) 0%, transparent 40%);
+}
+.hero-content {
+  max-width: 600px; z-index: 2;
+  animation: fadeUp 0.9s ease both;
+}
+@keyframes fadeUp { from { opacity:0; transform:translateY(30px); } to { opacity:1; transform:translateY(0); } }
+.hero-badge {
+  display: inline-block;
+  background: rgba(233,196,106,0.15);
+  border: 1px solid rgba(233,196,106,0.4);
+  color: var(--amber);
+  padding: 6px 16px; border-radius: 99px;
+  font-size: 0.8rem; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  margin-bottom: 24px;
+}
+.hero-title {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2.8rem, 6vw, 5rem);
+  font-weight: 700; line-height: 1.1;
+  color: white; margin-bottom: 20px;
+}
+.hero-title em { color: var(--amber); font-style: normal; }
+.hero-sub {
+  color: rgba(255,255,255,0.65);
+  font-size: 1.1rem; line-height: 1.7;
+  margin-bottom: 36px;
+}
+.hero-btns { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 48px; }
+.btn-primary {
+  background: var(--amber); color: var(--dark);
+  border: none; padding: 14px 28px; border-radius: 99px;
+  font-size: 0.95rem; font-weight: 600; cursor: pointer;
+  transition: all 0.25s;
+  text-decoration: none; display: inline-block;
+}
+.btn-primary:hover { background: var(--amber-dark); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(233,196,106,0.3); }
+.btn-secondary {
+  background: transparent;
+  border: 1.5px solid rgba(255,255,255,0.3);
+  color: white; padding: 14px 28px; border-radius: 99px;
+  font-size: 0.95rem; font-weight: 500; cursor: pointer;
+  transition: all 0.25s;
+}
+.btn-secondary:hover { border-color: var(--amber); color: var(--amber); }
+.hero-stats { display: flex; align-items: center; gap: 24px; }
+.stat { display: flex; flex-direction: column; }
+.stat-num {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2rem; font-weight: 700; color: var(--amber);
+}
+.stat-label { font-size: 0.8rem; color: rgba(255,255,255,0.5); }
+.stat-div { width: 1px; height: 40px; background: rgba(255,255,255,0.15); }
+
+/* Hero visual */
+.hero-visual {
+  position: absolute; right: 6%; top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+.hero-circle-outer {
+  width: 420px; height: 420px; border-radius: 50%;
+  border: 1px dashed rgba(233,196,106,0.3);
+  display: flex; align-items: center; justify-content: center;
+  animation: spin 30s linear infinite;
+}
+.hero-circle-mid {
+  width: 340px; height: 340px; border-radius: 50%;
+  background: rgba(45,106,79,0.2);
+  border: 1px solid rgba(233,196,106,0.2);
+  display: flex; align-items: center; justify-content: center;
+}
+.hero-circle-inner {
+  width: 240px; height: 240px; border-radius: 50%;
+  background: linear-gradient(135deg, rgba(233,196,106,0.2), rgba(45,106,79,0.3));
+  border: 2px solid rgba(233,196,106,0.4);
+  display: flex; align-items: center; justify-content: center;
+}
+.hero-emoji-main { font-size: 80px; filter: drop-shadow(0 8px 24px rgba(233,196,106,0.4)); }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.floating-badge {
+  position: absolute;
+  background: rgba(15,35,24,0.9);
+  border: 1px solid rgba(233,196,106,0.4);
+  color: white; padding: 8px 16px; border-radius: 99px;
+  font-size: 0.8rem; font-weight: 500; white-space: nowrap;
+}
+.b1 { top: 20%; left: -40px; animation: float1 4s ease-in-out infinite; }
+.b2 { top: 50%; right: -50px; animation: float1 4s ease-in-out infinite 1s; }
+.b3 { bottom: 25%; left: -20px; animation: float1 4s ease-in-out infinite 2s; }
+@keyframes float1 { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-8px); } }
+
+.scroll-hint {
+  position: absolute; bottom: 30px; left: 50%;
+  transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px; color: rgba(255,255,255,0.3); font-size: 0.75rem;
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+.scroll-arrow {
+  width: 20px; height: 20px;
+  border-right: 2px solid rgba(255,255,255,0.3);
+  border-bottom: 2px solid rgba(255,255,255,0.3);
+  transform: rotate(45deg);
+  animation: bounce 2s ease infinite;
+}
+@keyframes bounce { 0%,100% { transform:rotate(45deg) translateY(0); } 50% { transform:rotate(45deg) translateY(4px); } }
+
+/* ===== MARQUEE ===== */
+.marquee-strip {
+  background: var(--amber);
+  padding: 14px 0; overflow: hidden;
+}
+.marquee-track {
+  display: flex; gap: 32px;
+  animation: marquee 30s linear infinite;
+  width: max-content;
+}
+.marquee-track span { font-weight: 600; color: var(--dark); white-space: nowrap; font-size: 0.9rem; }
+@keyframes marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+/* ===== SECTION HEADERS ===== */
+.section-header { text-align: center; margin-bottom: 56px; }
+.section-header.light h2, .section-header.light p { color: white; }
+.section-tag {
+  display: inline-block;
+  background: var(--green-pale); color: var(--green);
+  padding: 5px 16px; border-radius: 99px;
+  font-size: 0.78rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  margin-bottom: 16px;
+}
+.section-header.light .section-tag { background: rgba(255,255,255,0.15); color: var(--amber); }
+.section-header h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700; color: var(--dark); margin-bottom: 12px;
+}
+.section-header p { color: var(--gray); font-size: 1.05rem; max-width: 560px; margin: 0 auto; }
+
+/* ===== PRODUCTS ===== */
+.products-section { padding: 100px 0; background: var(--cream); }
+.filter-tabs { display: flex; gap: 12px; justify-content: center; margin-bottom: 48px; flex-wrap: wrap; }
+.filter-btn {
+  background: white; border: 1.5px solid #e5e7eb;
+  color: var(--gray); padding: 9px 22px; border-radius: 99px;
+  font-size: 0.85rem; font-weight: 500; cursor: pointer;
+  transition: all 0.2s;
+}
+.filter-btn.active, .filter-btn:hover {
+  background: var(--green); border-color: var(--green);
+  color: white;
+}
+.products-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 28px;
+}
+.product-card {
+  background: white; border-radius: var(--radius);
+  overflow: hidden; box-shadow: var(--shadow);
+  transition: all 0.3s; border: 1px solid rgba(0,0,0,0.04);
+}
+.product-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-lg); }
+.pc-img {
+  height: 200px; background: var(--cream2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 72px; position: relative;
+}
+.pc-badge {
+  position: absolute; top: 12px; right: 12px;
+  background: var(--green); color: white;
+  padding: 4px 10px; border-radius: 99px;
+  font-size: 0.72rem; font-weight: 600;
+}
+.pc-body { padding: 20px; }
+.pc-cat { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--green); margin-bottom: 6px; }
+.pc-name { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 600; color: var(--dark); margin-bottom: 6px; }
+.pc-name-ur { font-family: 'Noto Nastaliq Urdu', serif; font-size: 0.95rem; color: var(--gray); margin-bottom: 10px; direction: rtl; }
+.pc-desc { font-size: 0.85rem; color: var(--gray); line-height: 1.6; margin-bottom: 16px; }
+.pc-footer { display: flex; align-items: center; justify-content: space-between; }
+.pc-price { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 700; color: var(--dark); }
+.pc-price span { font-size: 0.75rem; color: var(--gray); font-family: 'DM Sans', sans-serif; font-weight: 400; }
+.pc-btn {
+  background: var(--green); color: white;
+  border: none; padding: 9px 18px; border-radius: 99px;
+  font-size: 0.82rem; font-weight: 600; cursor: pointer;
+  transition: all 0.2s;
+}
+.pc-btn:hover { background: var(--green-light); transform: scale(1.04); }
+
+/* ===== ABOUT ===== */
+.about-section { padding: 100px 0; background: white; }
+.about-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: center; }
+.about-visual { position: relative; }
+.about-img-box {
+  width: 100%; aspect-ratio: 1;
+  background: linear-gradient(135deg, var(--green) 0%, var(--green-light) 100%);
+  border-radius: 24px;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 16px;
+}
+.about-img-emoji { font-size: 100px; }
+.about-img-label {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.5rem; font-weight: 600; color: white;
+}
+.about-card {
+  position: absolute; background: white; border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg); padding: 14px 20px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.85rem; font-weight: 600; color: var(--dark);
+}
+.about-card span { font-size: 1.4rem; }
+.ac1 { top: -16px; right: -16px; }
+.ac2 { bottom: 24px; left: -24px; }
+.about-text .section-tag { margin-bottom: 16px; }
+.about-text h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: clamp(2rem, 3.5vw, 2.8rem);
+  font-weight: 700; color: var(--dark); margin-bottom: 20px; line-height: 1.2;
+}
+.about-text p { color: var(--gray); font-size: 1rem; line-height: 1.8; margin-bottom: 28px; }
+.about-features { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+.af-item { display: flex; align-items: center; gap: 12px; font-size: 0.95rem; color: var(--dark); }
+
+/* ===== WHY SECTION ===== */
+.why-section { padding: 100px 0; background: var(--dark); }
+.why-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+}
+.why-card {
+  background: rgba(255,255,255,0.05);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius);
+  padding: 32px 28px;
+  transition: all 0.3s;
+}
+.why-card:hover {
+  background: rgba(233,196,106,0.08);
+  border-color: rgba(233,196,106,0.3);
+  transform: translateY(-4px);
+}
+.why-icon { font-size: 2.4rem; margin-bottom: 16px; }
+.why-card h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 700; color: white; margin-bottom: 10px; }
+.why-card p { color: rgba(255,255,255,0.55); font-size: 0.9rem; line-height: 1.6; }
+
+/* ===== ORDER SECTION ===== */
+.order-section { padding: 100px 0; background: var(--cream); }
+.order-wrapper { display: grid; grid-template-columns: 1.3fr 1fr; gap: 48px; align-items: start; }
+.order-form-box {
+  background: white; border-radius: var(--radius);
+  padding: 40px; box-shadow: var(--shadow);
+}
+.form-group { margin-bottom: 20px; }
+.form-group label {
+  display: block; font-size: 0.85rem; font-weight: 600;
+  color: var(--dark); margin-bottom: 8px;
+}
+.form-group input, .form-group select, .form-group textarea {
+  width: 100%; border: 1.5px solid #e5e7eb;
+  border-radius: var(--radius-sm); padding: 12px 16px;
+  font-size: 0.9rem; font-family: 'DM Sans', sans-serif;
+  color: var(--dark); background: white;
+  transition: border-color 0.2s; outline: none;
+}
+.form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+  border-color: var(--green);
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.btn-submit {
+  width: 100%; background: var(--green); color: white;
+  border: none; padding: 15px 28px; border-radius: var(--radius-sm);
+  font-size: 1rem; font-weight: 600; cursor: pointer;
+  transition: all 0.25s;
+}
+.btn-submit:hover { background: var(--green-light); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(45,106,79,0.3); }
+.order-info { display: flex; flex-direction: column; gap: 24px; }
+.oi-card {
+  background: white; border-radius: var(--radius);
+  padding: 28px; box-shadow: var(--shadow);
+}
+.oi-card h3 { font-family: 'Cormorant Garamond', serif; font-size: 1.3rem; font-weight: 700; color: var(--dark); margin-bottom: 20px; }
+.oi-step { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; font-size: 0.9rem; color: var(--dark); }
+.step-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--green); color: white;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75rem; font-weight: 700; flex-shrink: 0;
+}
+.whatsapp-card { background: linear-gradient(135deg, #25d366, #128c7e); }
+.whatsapp-card h3, .whatsapp-card p { color: white; }
+.whatsapp-card p { font-size: 0.9rem; opacity: 0.85; margin-bottom: 16px; }
+.btn-wa {
+  display: block; background: white; color: #128c7e;
+  text-align: center; padding: 12px 20px; border-radius: var(--radius-sm);
+  font-weight: 700; font-size: 0.9rem; text-decoration: none;
+  margin-bottom: 12px; transition: all 0.2s;
+}
+.btn-wa:hover { transform: scale(1.02); }
+.wa-num { color: white; font-size: 0.85rem; text-align: center; opacity: 0.8; }
+
+/* ===== TESTIMONIALS ===== */
+.testimonials-section { padding: 100px 0; background: white; }
+.testimonials-grid { display: grid; grid-template-columns: repeat(3,1fr); gap: 28px; }
+.t-card {
+  background: var(--cream); border-radius: var(--radius);
+  padding: 32px; border: 1px solid rgba(0,0,0,0.05);
+  transition: all 0.3s;
+}
+.t-card:hover { transform: translateY(-4px); box-shadow: var(--shadow); }
+.t-stars { font-size: 1.1rem; margin-bottom: 16px; }
+.t-card p { font-size: 0.95rem; color: var(--dark); line-height: 1.7; margin-bottom: 20px; font-style: italic; }
+.t-name { font-size: 0.82rem; font-weight: 700; color: var(--green); letter-spacing: 0.04em; }
+
+/* ===== CONTACT ===== */
+.contact-section { padding: 100px 0; background: var(--cream); }
+.contact-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 80px; align-items: start; }
+.contact-info .section-tag { margin-bottom: 16px; }
+.contact-info h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 2.5rem; font-weight: 700; color: var(--dark); margin-bottom: 32px; line-height: 1.2;
+}
+.ci-item { display: flex; gap: 16px; align-items: flex-start; margin-bottom: 24px; }
+.ci-item > span { font-size: 1.6rem; line-height: 1; }
+.ci-item strong { display: block; font-size: 0.85rem; font-weight: 700; color: var(--dark); margin-bottom: 4px; }
+.ci-item p { font-size: 0.9rem; color: var(--gray); line-height: 1.5; }
+.btn-wa-big {
+  display: inline-block; background: #25d366; color: white;
+  padding: 14px 28px; border-radius: 99px;
+  font-weight: 700; font-size: 0.95rem; text-decoration: none;
+  margin-top: 8px; transition: all 0.2s;
+}
+.btn-wa-big:hover { background: #128c7e; transform: translateY(-2px); }
+.contact-form-box {
+  background: white; border-radius: var(--radius);
+  padding: 40px; box-shadow: var(--shadow);
+}
+
+/* ===== FOOTER ===== */
+.footer { background: var(--dark); padding: 72px 0 0; }
+.footer-grid {
+  display: grid; grid-template-columns: 1.5fr 1fr 1fr 1.5fr;
+  gap: 48px; padding-bottom: 56px;
+}
+.footer-logo {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.6rem; font-weight: 700; color: var(--amber);
+  margin-bottom: 14px;
+}
+.footer-brand p { color: rgba(255,255,255,0.5); font-size: 0.9rem; line-height: 1.7; margin-bottom: 20px; }
+.wa-float {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(37,211,102,0.15); border: 1px solid rgba(37,211,102,0.3);
+  color: #25d366; padding: 8px 16px; border-radius: 99px;
+  font-size: 0.85rem; font-weight: 600; text-decoration: none;
+  transition: all 0.2s;
+}
+.wa-float:hover { background: rgba(37,211,102,0.25); }
+.footer-links h4, .footer-products h4, .footer-cities h4 {
+  font-size: 0.8rem; font-weight: 700; text-transform: uppercase;
+  letter-spacing: 0.1em; color: var(--amber); margin-bottom: 20px;
+}
+.footer-links ul, .footer-products ul { list-style: none; }
+.footer-links li, .footer-products li { margin-bottom: 10px; }
+.footer-links a { color: rgba(255,255,255,0.5); text-decoration: none; font-size: 0.9rem; transition: color 0.2s; }
+.footer-links a:hover { color: var(--amber); }
+.footer-products li { color: rgba(255,255,255,0.5); font-size: 0.9rem; }
+.footer-cities p { color: rgba(255,255,255,0.5); font-size: 0.9rem; line-height: 1.8; }
+.footer-bottom {
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 20px 32px; text-align: center;
+}
+.footer-bottom p { color: rgba(255,255,255,0.3); font-size: 0.82rem; }
+
+/* ===== WHATSAPP FLOAT ===== */
+.wa-float-btn {
+  position: fixed; bottom: 28px; right: 28px; z-index: 400;
+  width: 58px; height: 58px; border-radius: 50%;
+  background: #25d366;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 4px 20px rgba(37,211,102,0.5);
+  text-decoration: none;
+  animation: pulse 2.5s ease-in-out infinite;
+  transition: transform 0.2s;
+}
+.wa-float-btn:hover { transform: scale(1.1); }
+@keyframes pulse {
+  0%,100% { box-shadow: 0 4px 20px rgba(37,211,102,0.5); }
+  50% { box-shadow: 0 4px 40px rgba(37,211,102,0.8); }
+}
+
+/* ===== MODALS ===== */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; z-index: 1000;
+  background: rgba(0,0,0,0.7); backdrop-filter: blur(8px);
+  align-items: center; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: white; border-radius: var(--radius);
+  padding: 40px; max-width: 440px; width: 90%;
+  max-height: 90vh; overflow-y: auto;
+  position: relative;
+  animation: modalIn 0.3s ease;
+}
+@keyframes modalIn { from { opacity:0; transform:scale(0.92); } to { opacity:1; transform:scale(1); } }
+.modal h2 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.8rem; font-weight: 700; color: var(--dark); margin-bottom: 28px;
+}
+.modal-close {
+  position: absolute; top: 16px; right: 16px;
+  background: none; border: none; font-size: 1.2rem; cursor: pointer; color: var(--gray);
+}
+.modal-switch { text-align: center; margin-top: 16px; font-size: 0.88rem; color: var(--gray); }
+.modal-switch a { color: var(--green); text-decoration: none; font-weight: 600; }
+.social-divider {
+  display: flex; align-items: center; gap: 12px;
+  margin: 20px 0; color: var(--gray); font-size: 0.82rem;
+}
+.social-divider::before, .social-divider::after {
+  content: ''; flex: 1; height: 1px; background: #e5e7eb;
+}
+.social-btns { display: flex; flex-direction: column; gap: 10px; margin-bottom: 4px; }
+.btn-social {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  width: 100%; padding: 11px 16px; border-radius: 99px;
+  border: 1.5px solid #e5e7eb; background: white;
+  font-size: 0.9rem; font-weight: 600; cursor: pointer;
+  transition: all 0.2s; color: #1a1a1a;
+}
+.btn-social:hover { border-color: #aaa; box-shadow: 0 2px 8px rgba(0,0,0,0.08); transform: translateY(-1px); }
+.btn-social.google:hover { border-color: #4285F4; color: #4285F4; }
+.btn-social.facebook:hover { border-color: #1877F2; color: #1877F2; }
+.btn-social svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+.orders-list { display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto; }
+.order-item {
+  background: #f9fafb; border-radius: var(--radius-sm);
+  padding: 14px 18px; border: 1px solid #e5e7eb; font-size: 0.85rem;
+}
+.order-item strong { color: var(--dark); }
+.order-item span { color: var(--gray); }
+
+/* ===== SCREENSHOT SEND MODAL (STEP 2) ===== */
+.screenshot-modal {
+  max-width: 500px !important;
+}
+.ss-step-header {
+  display: flex; align-items: center; gap: 12px;
+  background: linear-gradient(135deg, #25d366, #128c7e);
+  margin: -40px -40px 28px -40px;
+  padding: 28px 40px;
+  border-radius: var(--radius) var(--radius) 0 0;
+}
+.ss-step-badge {
+  background: rgba(255,255,255,0.25);
+  color: white; font-size: 0.75rem; font-weight: 700;
+  padding: 4px 12px; border-radius: 99px;
+  letter-spacing: 0.08em; text-transform: uppercase;
+}
+.ss-step-header h3 {
+  font-family: 'Cormorant Garamond', serif;
+  font-size: 1.5rem; font-weight: 700; color: white;
+  margin: 4px 0 0 0;
+}
+.ss-step-header p {
+  color: rgba(255,255,255,0.85); font-size: 0.85rem; margin: 4px 0 0 0;
+}
+.ss-order-info {
+  background: #f0fdf4; border: 1.5px solid #86efac;
+  border-radius: var(--radius-sm); padding: 14px 18px; margin-bottom: 20px;
+  font-size: 0.88rem; color: #15803d; font-weight: 600;
+}
+.ss-img-preview {
+  width: 100%; border-radius: var(--radius-sm);
+  border: 2px solid #86efac; margin-bottom: 20px;
+  max-height: 240px; object-fit: cover;
+}
+.ss-instructions {
+  background: #fefce8; border: 1px solid #fde68a;
+  border-radius: var(--radius-sm); padding: 14px 18px;
+  margin-bottom: 20px;
+}
+.ss-instructions p {
+  font-size: 0.85rem; color: #92400e; font-weight: 600; margin-bottom: 6px;
+}
+.ss-instructions ol {
+  padding-left: 18px; font-size: 0.82rem; color: #92400e; line-height: 1.8;
+}
+.ss-btn-row { display: flex; gap: 12px; }
+.btn-download-ss {
+  flex: 1; background: var(--green); color: white;
+  border: none; padding: 13px 18px; border-radius: var(--radius-sm);
+  font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  transition: all 0.2s; display: flex; align-items: center;
+  justify-content: center; gap: 8px;
+}
+.btn-download-ss:hover { background: var(--green-light); transform: translateY(-1px); }
+.btn-done-ss {
+  flex: 1; background: #25d366; color: white;
+  border: none; padding: 13px 18px; border-radius: var(--radius-sm);
+  font-size: 0.9rem; font-weight: 700; cursor: pointer;
+  transition: all 0.2s; display: flex; align-items: center;
+  justify-content: center; gap: 8px; text-decoration: none;
+}
+.btn-done-ss:hover { background: #128c7e; transform: translateY(-1px); }
+
+/* ===== TOAST ===== */
+.toast {
+  position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(100px);
+  background: var(--dark); color: white;
+  padding: 14px 28px; border-radius: 99px;
+  font-size: 0.9rem; font-weight: 500;
+  z-index: 2000; opacity: 0; transition: all 0.3s;
+  pointer-events: none; white-space: nowrap;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ===== URDU MODE ===== */
+body.urdu-mode { font-family: 'Noto Nastaliq Urdu', serif; }
+body.urdu-mode [data-ur] { direction: rtl; }
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 1024px) {
+  .hero-visual { display: none; }
+  .about-grid, .contact-grid { grid-template-columns: 1fr; gap: 48px; }
+  .why-grid { grid-template-columns: repeat(2,1fr); }
+  .footer-grid { grid-template-columns: 1fr 1fr; }
+  .order-wrapper { grid-template-columns: 1fr; }
+  .testimonials-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 768px) {
+  .nav-links, .nav-actions { display: none; }
+  .hamburger { display: flex; }
+  .hero { padding: 90px 24px 60px; }
+  .container { padding: 0 20px; }
+  .why-grid, .testimonials-grid { grid-template-columns: 1fr; }
+  .footer-grid { grid-template-columns: 1fr; gap: 32px; }
+  .form-row { grid-template-columns: 1fr; }
+  .hero-btns { flex-direction: column; }
+  .hero-stats { flex-wrap: wrap; gap: 16px; }
+  .ss-step-header { margin: -40px -20px 24px -20px; padding: 24px 20px; }
+  .ss-btn-row { flex-direction: column; }
+}
+</style>
+</head>
+<body>
+
+<!-- LOADER -->
+<div id="loader">
+  <div class="loader-inner">
+    <div class="loader-logo">EarthSweet</div>
+    <div class="loader-bar"><div class="loader-fill"></div></div>
+  </div>
+</div>
+
+<!-- NAVBAR -->
+<nav id="navbar">
+  <div class="nav-container">
+    <a href="#home" class="nav-logo">
+      <span class="logo-leaf">🌿</span>
+      <span>EarthSweet</span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#home">Home</a></li>
+      <li><a href="#products">Products</a></li>
+      <li><a href="#about">About</a></li>
+      <li><a href="#order">Order</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+    <div class="nav-actions">
+      <button class="lang-toggle" onclick="toggleLang()">اردو</button>
+      <button class="btn-login" onclick="showModal('loginModal')">Login</button>
+      <button class="btn-logout" id="logoutBtn" onclick="logoutUser()">🚪 Logout</button>
+      <a href="track-order.html" class="btn-secondary">📦 Track Order</a>
+      <button class="btn-order" onclick="scrollTo('order')">Order Now</button>
+    </div>
+    <div class="hamburger" onclick="toggleMenu()">
+      <span></span><span></span><span></span>
+    </div>
+  </div>
+</nav>
+
+<!-- MOBILE MENU -->
+<div class="mobile-menu" id="mobileMenu">
+  <ul>
+    <li><a href="#home" onclick="toggleMenu()">Home</a></li>
+    <li><a href="#products" onclick="toggleMenu()">Products</a></li>
+    <li><a href="#about" onclick="toggleMenu()">About</a></li>
+    <li><a href="#order" onclick="toggleMenu()">Order</a></li>
+    <li><a href="#contact" onclick="toggleMenu()">Contact</a></li>
+    <li><a href="track-order.html">📦 Track Order</a></li>
+    <li><a href="#" onclick="showModal('loginModal');toggleMenu()">Customer Login</a></li>
+  </ul>
+</div>
+
+<!-- HERO -->
+<section id="home" class="hero">
+  <div class="hero-bg">
+    <div class="hero-pattern"></div>
+  </div>
+  <div class="hero-content">
+    <div class="hero-badge" data-en="100% Natural • Farm Fresh" data-ur="۱۰۰٪ قدرتی • کھیت سے تازہ">100% Natural • Farm Fresh</div>
+    <h1 class="hero-title" data-en="Pure Sweetness<br>From Earth to You" data-ur="زمین کی میٹھاس<br>آپ تک">Pure Sweetness<br>From Earth to You</h1>
+    <p class="hero-sub" data-en="Premium quality Gur, Shakar & fresh Sugarcane — harvested from the fertile fields of Punjab. Delivered across Pakistan." data-ur="اعلیٰ معیار کا گڑ، شکر اور تازہ گنا — پنجاب کے زرخیز کھیتوں سے۔ پورے پاکستان میں ترسیل۔">Premium quality Gur, Shakar & fresh Sugarcane — harvested from the fertile fields of Punjab. Delivered across Pakistan.</p>
+    <div class="hero-btns">
+      <button class="btn-primary" onclick="scrollTo('products')" data-en="Explore Products" data-ur="مصنوعات دیکھیں">Explore Products</button>
+      <button class="btn-secondary" onclick="scrollTo('order')" data-en="Place an Order" data-ur="آرڈر کریں">Place an Order</button>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><span class="stat-num">500+</span><span class="stat-label" data-en="Happy Customers" data-ur="خوش گاہک">Happy Customers</span></div>
+      <div class="stat-div"></div>
+      <div class="stat"><span class="stat-num">20+</span><span class="stat-label" data-en="Cities Served" data-ur="شہر">Cities Served</span></div>
+      <div class="stat-div"></div>
+      <div class="stat"><span class="stat-num">100%</span><span class="stat-label" data-en="Pure & Natural" data-ur="خالص و قدرتی">Pure & Natural</span></div>
+    </div>
+  </div>
+  <div class="hero-visual" onclick="scrollTo('order')" style="cursor:pointer;" title="">
+    <div class="hero-circle-outer">
+      <div class="hero-circle-mid">
+        <div class="hero-circle-inner">
+          <img id="heroProductImg" src="/uploads/gurrpack.png" alt="Fresh Gur" style="width: 220px; height: 220px; object-fit: cover; border-radius: 50%; box-shadow: 0 4px 24px rgba(233,196,106,0.18); border: 4px solid #fff; background: #f5f0e0;" onerror="this.style.display='none';document.getElementById('heroEmoji').style.display='block'" />
+          <div class="hero-emoji-main" id="heroEmoji" style="display:none;">🌾</div>
+        </div>
+      </div>
+    </div>
+    <div class="floating-badge b1">🍯 Pure Gur</div>
+    <div class="floating-badge b2">🌿 Organic</div>
+    <div class="floating-badge b3">📦 Fast Delivery</div>
+  </div>
+  <div class="scroll-hint">
+    <span>Scroll</span>
+    <div class="scroll-arrow"></div>
+  </div>
+</section>
+
+<!-- MARQUEE -->
+<div class="marquee-strip">
+  <div class="marquee-track">
+    <span>🌾 Pure Gur</span><span>•</span>
+    <span>🍚 Premium Shakar</span><span>•</span>
+    <span>🌿 Fresh Sugarcane / گنا</span><span>•</span>
+    <span>🚚 Pakistan-wide Delivery</span><span>•</span>
+    <span>✅ 100% Natural</span><span>•</span>
+    <span>🌾 خالص گڑ</span><span>•</span>
+    <span>🍚 اعلیٰ شکر</span><span>•</span>
+    <span>🌿 تازہ گنا</span><span>•</span>
+    <span>🚚 پورے پاکستان ترسیل</span><span>•</span>
+    <span>🌾 Pure Gur</span><span>•</span>
+    <span>🍚 Premium Shakar</span><span>•</span>
+    <span>🌿 Fresh Sugarcane / گنا</span><span>•</span>
+    <span>🚚 Pakistan-wide Delivery</span><span>•</span>
+    <span>✅ 100% Natural</span><span>•</span>
+    <span>🌾 خالص گڑ</span><span>•</span>
+    <span>🍚 اعلیٰ شکر</span><span>•</span>
+    <span>🌿 تازہ گنا</span><span>•</span>
+    <span>🚚 پورے پاکستان ترسیل</span><span>•</span>
+  </div>
+</div>
+
+<!-- PRODUCTS -->
+<section id="products" class="products-section">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag" data-en="Our Products" data-ur="ہماری مصنوعات">Our Products</div>
+      <h2 data-en="Nature's Finest Sweetness" data-ur="قدرت کی بہترین میٹھاس">Nature's Finest Sweetness</h2>
+      <p data-en="Sourced directly from our farms — no additives, no preservatives." data-ur="براہ راست ہمارے کھیتوں سے — کوئی ملاوٹ نہیں۔">Sourced directly from our farms — no additives, no preservatives.</p>
+    </div>
+    <div class="filter-tabs">
+      <button class="filter-btn active" onclick="filterProducts('all')" data-en="All" data-ur="سب">All</button>
+      <button class="filter-btn" onclick="filterProducts('gur')" data-en="Gur" data-ur="گڑ">Gur</button>
+      <button class="filter-btn" onclick="filterProducts('shakar')" data-en="Shakar" data-ur="شکر">Shakar</button>
+      <button class="filter-btn" onclick="filterProducts('ganna')" data-en="Sugarcane" data-ur="گنا">Sugarcane</button>
+    </div>
+    <div class="products-grid" id="productsGrid"></div>
+  </div>
+</section>
+
+<!-- ABOUT -->
+<section id="about" class="about-section">
+  <div class="container about-grid">
+    <div class="about-visual">
+      <div class="about-img-box" style="padding:0;overflow:hidden;position:relative;">
+        <img src="/uploads/about.png" alt="Pure Gur" style="width:100%;height:100%;object-fit:cover;border-radius:24px;"
+          onerror="this.style.display='none';document.getElementById('aboutFallback').style.display='flex'" />
+        <div id="aboutFallback" style="display:none;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;background:linear-gradient(135deg,var(--green) 0%,var(--green-light) 100%);border-radius:24px;gap:16px;position:absolute;inset:0;">
+          <div class="about-img-emoji">🌾</div>
+          <div class="about-img-label" data-en="Punjab's Finest" data-ur="پنجاب کا بہترین">Punjab's Finest</div>
+        </div>
+      </div>
+      <div class="about-card ac1"><span>🏆</span><p data-en="Trusted Since 2010" data-ur="۲۰۱۰ سے قابل اعتماد">Trusted Since 2010</p></div>
+      <div class="about-card ac2"><span>🌿</span><p data-en="Zero Chemicals" data-ur="کوئی کیمیکل نہیں">Zero Chemicals</p></div>
+    </div>
+    <div class="about-text">
+      <div class="section-tag" data-en="About EarthSweet" data-ur="ارتھ سویٹ کے بارے میں">About EarthSweet</div>
+      <h2 data-en="From Our Fields,<br>To Your Table" data-ur="ہمارے کھیتوں سے<br>آپ کی میز تک">From Our Fields,<br>To Your Table</h2>
+      <p data-en="EarthSweet is Pakistan's premium natural sweetener brand. We grow and process pure Gur (jaggery), Shakar (raw sugar), and fresh Sugarcane in the heart of Punjab — and deliver across Pakistan with care." data-ur="ارتھ سویٹ پاکستان کا اعلیٰ قدرتی مٹھاس کا برانڈ ہے۔ ہم پنجاب کے قلب میں خالص گڑ، شکر اور تازہ گنا اگاتے اور پروسیس کرتے ہیں۔">EarthSweet is Pakistan's premium natural sweetener brand. We grow and process pure Gur (jaggery), Shakar (raw sugar), and fresh Sugarcane in the heart of Punjab — and deliver across Pakistan with care.</p>
+      <div class="about-features">
+        <div class="af-item"><span>✅</span><span data-en="Direct from farm — no middlemen" data-ur="براہ راست کھیت سے">Direct from farm — no middlemen</span></div>
+        <div class="af-item"><span>✅</span><span data-en="Traditional stone-pressed Gur" data-ur="روایتی پتھر کا گڑ">Traditional stone-pressed Gur</span></div>
+        <div class="af-item"><span>✅</span><span data-en="Bulk & retail orders welcome" data-ur="بڑے اور چھوٹے آرڈر قبول">Bulk & retail orders welcome</span></div>
+        <div class="af-item"><span>✅</span><span data-en="Delivery across 20+ cities" data-ur="۲۰ سے زیادہ شہروں میں ترسیل">Delivery across 20+ cities</span></div>
+      </div>
+      <a href="https://wa.me/923167348570" target="_blank" class="btn-primary" data-en="Chat With Us on WhatsApp" data-ur="واٹس ایپ پر بات کریں">Chat With Us on WhatsApp</a>
+    </div>
+  </div>
+</section>
+
+<!-- WHY US -->
+<section class="why-section">
+  <div class="container">
+    <div class="section-header light">
+      <div class="section-tag" data-en="Why EarthSweet?" data-ur="ارتھ سویٹ کیوں؟">Why EarthSweet?</div>
+      <h2 data-en="The EarthSweet Difference" data-ur="ارتھ سویٹ کی خصوصیت">The EarthSweet Difference</h2>
+    </div>
+    <div class="why-grid">
+      <div class="why-card"><div class="why-icon">🌿</div><h3 data-en="100% Natural" data-ur="۱۰۰٪ قدرتی">100% Natural</h3><p data-en="No chemicals, no artificial colors, no preservatives — just pure nature." data-ur="کوئی کیمیکل نہیں، کوئی رنگ نہیں — صرف قدرت">No chemicals, no artificial colors — just pure nature.</p></div>
+      <div class="why-card"><div class="why-icon">🚚</div><h3 data-en="Fast Delivery" data-ur="تیز ترسیل">Fast Delivery</h3><p data-en="Delivering to Karachi, Lahore, Islamabad, Faisalabad & 20+ cities." data-ur="کراچی، لاہور، اسلام آباد اور ۲۰ سے زیادہ شہروں میں ترسیل">20+ cities covered across Pakistan.</p></div>
+      <div class="why-card"><div class="why-icon">💰</div><h3 data-en="Best Prices" data-ur="بہترین قیمتیں">Best Prices</h3><p data-en="Wholesale and retail pricing — directly from our farm to you." data-ur="تھوک اور خوردہ قیمتیں — کھیت سے آپ تک">Wholesale & retail — farm direct pricing.</p></div>
+      <div class="why-card"><div class="why-icon">📦</div><h3 data-en="Secure Packaging" data-ur="محفوظ پیکنگ">Secure Packaging</h3><p data-en="Hygienic, airtight packaging that preserves freshness and flavor." data-ur="حفظان صحت، ہوا بند پیکنگ">Hygienic airtight packaging for freshness.</p></div>
+      <div class="why-card"><div class="why-icon">⭐</div><h3 data-en="Premium Quality" data-ur="اعلیٰ معیار">Premium Quality</h3><p data-en="Quality checked at every step — from harvest to your doorstep." data-ur="ہر قدم پر معیار جانچا جاتا ہے">Quality checked from harvest to delivery.</p></div>
+      <div class="why-card"><div class="why-icon">💬</div><h3 data-en="24/7 Support" data-ur="ہر وقت مدد">24/7 Support</h3><p data-en="We're always available on WhatsApp for your queries and orders." data-ur="آپ کے سوالات کے لیے ہمیشہ واٹس ایپ پر موجود">Always available on WhatsApp.</p></div>
+    </div>
+  </div>
+</section>
+
+<!-- ORDER FORM -->
+<section id="order" class="order-section">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag" data-en="Place Your Order" data-ur="آرڈر دیں">Place Your Order</div>
+      <h2 data-en="Order Fresh & Natural" data-ur="تازہ اور قدرتی آرڈر کریں">Order Fresh & Natural</h2>
+      <p data-en="Fill the form below and we'll confirm your order via WhatsApp." data-ur="نیچے فارم بھریں، ہم واٹس ایپ پر تصدیق کریں گے۔">Fill the form below — we'll confirm via WhatsApp.</p>
+    </div>
+    <div class="order-wrapper">
+      <div class="order-form-box">
+        <div class="form-group">
+          <label data-en="Full Name" data-ur="پورا نام">Full Name / پورا نام</label>
+          <input type="text" id="orderName" placeholder="Muhammad Ali" />
+        </div>
+        <div class="form-group">
+          <label data-en="Phone / WhatsApp" data-ur="فون / واٹس ایپ">Phone / WhatsApp</label>
+          <input type="tel" id="orderPhone" placeholder="03XX-XXXXXXX" />
+        </div>
+        <div class="form-group">
+          <label data-en="City" data-ur="شہر">City / شہر</label>
+          <select id="orderCity">
+            <option value="">Select City / شہر منتخب کریں</option>
+            <option>Karachi</option><option>Lahore</option><option>Islamabad</option>
+            <option>Rawalpindi</option><option>Faisalabad</option><option>Multan</option>
+            <option>Sargodha</option><option>Gujranwala</option><option>Sialkot</option>
+            <option>Hyderabad</option><option>Peshawar</option><option>Quetta</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label data-en="Product" data-ur="مصنوعہ">Product / مصنوعہ</label>
+          <select id="orderProduct">
+            <option value="">Select Product</option>
+            <option>Pure Gur — خالص گڑ (1 kg)</option>
+            <option>Pure Gur — خالص گڑ (5 kg)</option>
+            <option>Pure Gur — خالص گڑ (10 kg)</option>
+            <option>Shakar — شکر (1 kg)</option>
+            <option>Shakar — شکر (5 kg)</option>
+            <option>Shakar — شکر (10 kg)</option>
+            <option>Fresh Sugarcane — تازہ گنا (Bundle)</option>
+            <option>Mixed Pack (Gur + Shakar)</option>
+            <option>Bulk / Wholesale Order</option>
+          </select>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label data-en="Quantity" data-ur="مقدار">Quantity</label>
+            <input type="number" id="orderQty" placeholder="1" min="1" />
+          </div>
+          <div class="form-group">
+            <label data-en="Delivery Address" data-ur="پتہ">Address</label>
+            <input type="text" id="orderAddress" placeholder="Street, Area" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label data-en="Notes (Optional)" data-ur="نوٹ (اختیاری)">Notes / نوٹ</label>
+          <textarea id="orderNotes" placeholder="Any special request..." rows="3"></textarea>
+        </div>
+        <div class="form-group">
+          <label data-en="Payment Method" data-ur="ادائیگی کا طریقہ">Payment Method / ادائیگی کا طریقہ</label>
+          <select id="orderPayment" onchange="togglePaymentInfo()">
+            <option value="cod">💰 Cash on Delivery (COD)</option>
+            <option value="easypaisa">📱 Easypaisa</option>
+            <option value="jazzcash">📱 JazzCash</option>
+          </select>
+        </div>
+
+        <!-- Payment Info Box -->
+        <div id="paymentInfoBox" style="display:none; background:#f0fdf4; border:1.5px solid #22c55e; border-radius:12px; padding:18px 20px; margin-bottom:20px;">
+          <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+            <span style="font-size:1.4rem;" id="paymentIcon">📱</span>
+            <div>
+              <div style="font-weight:700; font-size:1rem; color:#15803d;" id="paymentTitle">Easypaisa Account</div>
+              <div style="font-size:0.82rem; color:#166534;">Send payment to this account</div>
+            </div>
+          </div>
+          <div style="background:white; border-radius:8px; padding:14px 16px; margin-bottom:12px; border:1px solid #bbf7d0;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+              <span style="font-size:0.82rem; color:#6b7280;">Account Number</span>
+              <span style="font-weight:700; font-size:1rem; color:#15803d; letter-spacing:0.05em;">0316-7348570</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+              <span style="font-size:0.82rem; color:#6b7280;">Account Name</span>
+              <span style="font-weight:700; font-size:0.95rem; color:#1a1a1a;">KHIZER ABBAS</span>
+            </div>
+          </div>
+          <div style="background:#fefce8; border:1px solid #fde68a; border-radius:8px; padding:10px 14px; margin-bottom:14px;">
+            <p style="font-size:0.82rem; color:#92400e; font-weight:600;">⚠️ Payment karne ke baad screenshot zaroor bhejein!</p>
+            <p style="font-size:0.78rem; color:#92400e; margin-top:4px;">After sending payment, upload the transaction screenshot below.</p>
+          </div>
+          <div>
+            <label style="display:block; font-size:0.85rem; font-weight:600; color:#15803d; margin-bottom:8px;">📸 Transaction Screenshot <span style="color:#ef4444;">*Required</span></label>
+            <div id="uploadArea" onclick="document.getElementById('paymentScreenshot').click()" style="border:2px dashed #86efac; border-radius:10px; padding:24px; text-align:center; cursor:pointer; background:white; transition:all 0.2s;">
+              <div style="font-size:2rem; margin-bottom:8px;">📤</div>
+              <div style="font-size:0.85rem; color:#15803d; font-weight:600;">Click to upload screenshot</div>
+              <div style="font-size:0.75rem; color:#6b7280; margin-top:4px;">JPG, PNG — Max 5MB</div>
+            </div>
+            <input type="file" id="paymentScreenshot" accept="image/*" style="display:none;" onchange="previewScreenshot()" />
+            <div id="screenshotPreview" style="display:none; margin-top:12px; position:relative;">
+              <img id="previewImg" style="width:100%; border-radius:8px; border:1px solid #bbf7d0;" />
+              <button onclick="removeScreenshot()" style="position:absolute; top:8px; right:8px; background:#ef4444; color:white; border:none; border-radius:50%; width:28px; height:28px; cursor:pointer; font-size:1rem; line-height:1;">✕</button>
+              <div style="background:#dcfce7; border-radius:6px; padding:8px 12px; margin-top:8px; font-size:0.8rem; color:#15803d; font-weight:600;">✅ Screenshot uploaded! Order place karne par admin ko automatically send hoga.</div>
+            </div>
+          </div>
+        </div>
+
+        <button class="btn-submit" id="placeOrderBtn" onclick="placeOrder()" data-en="Place Order via WhatsApp 📲" data-ur="واٹس ایپ پر آرڈر کریں 📲">Place Order via WhatsApp 📲</button>
+      </div>
+      <div class="order-info">
+        <div class="oi-card">
+          <h3 data-en="Order Process" data-ur="آرڈر کا طریقہ">Order Process</h3>
+          <div class="oi-step"><span class="step-num">1</span><span data-en="Fill the form & submit" data-ur="فارم بھریں اور جمع کریں">Fill the form & submit</span></div>
+          <div class="oi-step"><span class="step-num">2</span><span data-en="WhatsApp opens with order details" data-ur="واٹس ایپ پر آرڈر کی تفصیل">WhatsApp opens with order details</span></div>
+          <div class="oi-step"><span class="step-num">3</span><span data-en="Send payment screenshot (if online)" data-ur="ادائیگی کا اسکرین شاٹ بھیجیں">Send payment screenshot (if online)</span></div>
+          <div class="oi-step"><span class="step-num">4</span><span data-en="We confirm & dispatch your order" data-ur="ہم تصدیق اور ترسیل کریں گے">We confirm & dispatch your order</span></div>
+        </div>
+        <div class="oi-card whatsapp-card">
+          <h3>💬 Direct WhatsApp</h3>
+          <p data-en="Prefer to chat directly? Message us now!" data-ur="براہ راست بات کرنا چاہتے ہیں؟">Message us directly!</p>
+          <a href="https://wa.me/923167348570" target="_blank" class="btn-wa">Open WhatsApp Chat</a>
+          <p class="wa-num">📱 0316-7348570</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TESTIMONIALS -->
+<section class="testimonials-section">
+  <div class="container">
+    <div class="section-header">
+      <div class="section-tag" data-en="Customer Reviews" data-ur="گاہکوں کی رائے">Customer Reviews</div>
+      <h2 data-en="What Our Customers Say" data-ur="ہمارے گاہک کیا کہتے ہیں">What Our Customers Say</h2>
+    </div>
+    <div class="testimonials-grid">
+      <div class="t-card"><div class="t-stars">⭐⭐⭐⭐⭐</div><p>"Gur bilkul asli hai — bahut achha taste aur pure quality. EarthSweet ka product use karna shuru kiya aur koi dusri jagah se nahi lena."</p><div class="t-name">— Ahmad Raza, Lahore</div></div>
+      <div class="t-card"><div class="t-stars">⭐⭐⭐⭐⭐</div><p>"Shakar ki quality outstanding hai. Fast delivery aur packaging bhi bohat achi thi. Highly recommended for bulk orders!"</p><div class="t-name">— Fatima Malik, Karachi</div></div>
+      <div class="t-card"><div class="t-stars">⭐⭐⭐⭐⭐</div><p>"Ganna fresh tha, seedha khet se aa raha tha. Price bhi market se behtar. EarthSweet is the best natural sweet brand in Pakistan!"</p><div class="t-name">— Usman Shah, Islamabad</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- CONTACT -->
+<section id="contact" class="contact-section">
+  <div class="container contact-grid">
+    <div class="contact-info">
+      <div class="section-tag" data-en="Get In Touch" data-ur="رابطہ کریں">Get In Touch</div>
+      <h2 data-en="We're Here For You" data-ur="ہم آپ کے لیے موجود ہیں">We're Here For You</h2>
+      <div class="ci-item"><span>📱</span><div><strong data-en="Phone / WhatsApp" data-ur="فون">Phone / WhatsApp</strong><p>0316-7348570</p></div></div>
+      <div class="ci-item"><span>📍</span><div><strong data-en="Location" data-ur="مقام">Location</strong><p data-en="Multan Punjab, Pakistan" data-ur="ملتان، پنجاب، پاکستان">Multan Punjab, Pakistan</p></div></div>
+      <div class="ci-item"><span>🕐</span><div><strong data-en="Business Hours" data-ur="اوقات کار">Business Hours</strong><p data-en="Mon–Sat: 8AM – 8PM" data-ur="پیر–ہفتہ: صبح ۸ – شام ۸">Mon–Sat: 8AM – 8PM</p></div></div>
+      <div class="ci-item"><span>🚚</span><div><strong data-en="Delivery Cities" data-ur="ترسیل کے شہر">Delivery Cities</strong><p data-en="Karachi, Lahore, Islamabad, Rawalpindi, Faisalabad, Multan, Gujranwala, Sialkot, Hyderabad & more" data-ur="کراچی، لاہور، اسلام آباد، راولپنڈی، فیصل آباد، ملتان، سرگودھا اور مزید">Karachi, Lahore, Islamabad, Faisalabad & 15+ more cities</p></div></div>
+      <a href="https://wa.me/923167348570" target="_blank" class="btn-wa-big">📲 WhatsApp Us Now</a>
+    </div>
+    <div class="contact-form-box">
+      <div class="form-group">
+        <label>Name / نام</label>
+        <input type="text" id="cName" placeholder="Your Name" />
+      </div>
+      <div class="form-group">
+        <label>Phone / فون</label>
+        <input type="tel" id="cPhone" placeholder="03XX-XXXXXXX" />
+      </div>
+      <div class="form-group">
+        <label>Message / پیغام</label>
+        <textarea id="cMsg" rows="5" placeholder="Your message / آپ کا پیغام..."></textarea>
+      </div>
+      <button class="btn-submit" onclick="sendContact()" data-en="Send Message" data-ur="پیغام بھیجیں">Send Message</button>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container footer-grid">
+    <div class="footer-brand">
+      <div class="footer-logo">🌿 EarthSweet</div>
+      <p data-en="Pure Gur, Shakar & Sugarcane — directly from Punjab's finest fields." data-ur="خالص گڑ، شکر اور گنا — پنجاب کے بہترین کھیتوں سے۔">Pure Gur, Shakar & Sugarcane — from Punjab's finest fields.</p>
+      <a href="https://wa.me/923167348570" target="_blank" class="wa-float">💬 0316-7348570</a>
+    </div>
+    <div class="footer-links">
+      <h4 data-en="Quick Links" data-ur="فوری روابط">Quick Links</h4>
+      <ul>
+        <li><a href="#home">Home</a></li>
+        <li><a href="#products">Products</a></li>
+        <li><a href="#about">About</a></li>
+        <li><a href="#order">Order</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ul>
+    </div>
+    <div class="footer-products">
+      <h4 data-en="Our Products" data-ur="ہماری مصنوعات">Our Products</h4>
+      <ul>
+        <li>Pure Gur — خالص گڑ</li>
+        <li>Shakar — شکر</li>
+        <li>Fresh Sugarcane — گنا</li>
+        <li>Bulk / Wholesale</li>
+      </ul>
+    </div>
+    <div class="footer-cities">
+      <h4 data-en="We Deliver To" data-ur="ترسیل">We Deliver To</h4>
+      <p>Karachi • Lahore • Islamabad • Rawalpindi • Faisalabad • Multan • Sargodha • Gujranwala • Sialkot • Hyderabad & more</p>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <p>© 2024 EarthSweet. All rights reserved. | Made with 🌿 in Pakistan</p>
+  </div>
+</footer>
+
+<!-- WHATSAPP FLOAT BUTTON -->
+<a href="https://wa.me/923167348570" target="_blank" class="wa-float-btn" title="Chat on WhatsApp">
+  <svg viewBox="0 0 24 24" fill="white" width="28" height="28"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.890-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+</a>
+
+<!-- LOGIN MODAL -->
+<div class="modal-overlay" id="loginModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('loginModal')">✕</button>
+    <h2>Customer Login</h2>
+    <div class="form-group">
+      <label>Phone Number</label>
+      <input type="tel" id="loginPhone" placeholder="03XX-XXXXXXX" />
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <input type="password" id="loginPass" placeholder="••••••••" />
+    </div>
+    <button class="btn-submit" onclick="loginUser()">Login</button>
+    <p class="modal-switch">Don't have an account? <a href="#" onclick="switchModal('loginModal','registerModal')">Register</a></p>
+    <div class="social-divider">or continue with</div>
+    <div class="social-btns">
+      <button class="btn-social google" onclick="signInWithGoogle()">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+      <button class="btn-social facebook" onclick="signInWithFacebook()">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        Continue with Facebook
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- REGISTER MODAL -->
+<div class="modal-overlay" id="registerModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal('registerModal')">✕</button>
+    <h2>Create Account</h2>
+    <div class="form-group"><label>Full Name</label><input type="text" id="regName" placeholder="Muhammad Ali" /></div>
+    <div class="form-group"><label>Phone</label><input type="tel" id="regPhone" placeholder="03XX-XXXXXXX" /></div>
+    <div class="form-group"><label>City</label><input type="text" id="regCity" placeholder="Lahore" /></div>
+    <div class="form-group"><label>Password</label><input type="password" id="regPass" placeholder="••••••••" /></div>
+    <button class="btn-submit" onclick="registerUser()">Create Account</button>
+    <p class="modal-switch">Already have an account? <a href="#" onclick="switchModal('registerModal','loginModal')">Login</a></p>
+    <div class="social-divider">or continue with</div>
+    <div class="social-btns">
+      <button class="btn-social google" onclick="signInWithGoogle()">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Continue with Google
+      </button>
+      <button class="btn-social facebook" onclick="signInWithFacebook()">
+        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path fill="#1877F2" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        Continue with Facebook
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ===== ORDER CONFIRMED + SCREENSHOT MODAL ===== -->
+<div class="modal-overlay" id="screenshotModal">
+  <div class="modal screenshot-modal">
+
+    <!-- Green header -->
+    <div class="ss-step-header">
+      <div>
+        <div class="ss-step-badge">✓ Order Confirmed</div>
+        <h3>🎉 Order Place Ho Gaya!</h3>
+        <p>Screenshot WhatsApp par bhi gaya, admin ko bhi mil gaya</p>
+      </div>
+    </div>
+
+    <!-- Order summary -->
+    <div class="ss-order-info" id="ssOrderInfo">✅ Order successfully placed!</div>
+
+    <!-- Screenshot preview -->
+    <p style="font-size:0.88rem;color:#374151;font-weight:600;margin-bottom:10px;">Aapka payment screenshot:</p>
+    <img id="ssImgPreview" class="ss-img-preview" src="" alt="Payment Screenshot" />
+
+    <!-- Two status boxes side by side -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:18px;">
+
+      <!-- WhatsApp status -->
+      <div id="waShareStatus" style="border-radius:8px;padding:12px 14px;font-size:0.82rem;font-weight:600;background:#f0fdf4;border:1.5px solid #86efac;color:#15803d;text-align:center;">
+        <div style="font-size:1.3rem;margin-bottom:4px;">📲</div>
+        WhatsApp par<br><strong>image + message gaya!</strong>
+      </div>
+
+      <!-- Admin dashboard status -->
+      <div id="adminSentStatus" style="border-radius:8px;padding:12px 14px;font-size:0.82rem;font-weight:600;background:#f0fdf4;border:1.5px solid #86efac;color:#15803d;text-align:center;">
+        <div style="font-size:1.3rem;margin-bottom:4px;">📊</div>
+        Admin dashboard par<br><strong>screenshot save ho gaya!</strong>
+      </div>
+    </div>
+
+    <!-- Desktop fallback notice — only shown when Web Share API is not used -->
+    <div id="desktopFallbackNote" style="display:none;background:#fefce8;border:1px solid #fde68a;border-radius:8px;padding:12px 14px;font-size:0.82rem;color:#92400e;margin-bottom:16px;">
+      💻 <strong>Desktop par:</strong> Screenshot automatically download ho gayi hai.<br>
+      WhatsApp chat mein yeh downloaded image attach kar dein.
+    </div>
+
+    <!-- Action buttons -->
+    <div class="ss-btn-row">
+      <button class="btn-download-ss" onclick="downloadScreenshot()">⬇️ Screenshot Save</button>
+      <button class="btn-done-ss" onclick="closeModal('screenshotModal')" style="text-decoration:none;">✓ Done, Shukriya!</button>
+    </div>
+
+    <p style="text-align:center;font-size:0.75rem;color:#9ca3af;margin-top:14px;">
+      Admin aapka payment verify karega aur order confirm karega
+    </p>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast" class="toast"></div>
+
+<script>
+var API_URL = window.location.port === '5000' ? '/api' : 'http://localhost:5000/api';
+var currentUser = JSON.parse(localStorage.getItem('es_user') || 'null');
+var currentToken = localStorage.getItem('es_token') || null;
+var allProducts = [];
+var currentLang = 'en';
+// Store screenshot data globally
+var _screenshotDataURL = null;
+var _screenshotFileName = 'payment-screenshot.jpg';
+
+function apiCall(method, path, body) {
+  var headers = {'Content-Type': 'application/json'};
+  if (currentToken) headers['Authorization'] = 'Bearer ' + currentToken;
+  return fetch(API_URL + path, {
+    method: method,
+    headers: headers,
+    body: body ? JSON.stringify(body) : null
+  }).then(function(r){ return r.json(); });
+}
+
+// LOADER
+window.addEventListener('load', function() {
+  var l = document.getElementById('loader');
+  setTimeout(function() {
+    if(l){ l.style.opacity='0'; setTimeout(function(){ l.style.display='none'; }, 400); }
+  }, 800);
+  loadProducts();
+  loadCities();
+  updateNavUser();
+});
+
+// NAVBAR
+window.addEventListener('scroll', function() {
+  var nav = document.getElementById('navbar');
+  nav.style.boxShadow = window.scrollY > 50 ? '0 4px 32px rgba(0,0,0,0.3)' : 'none';
+});
+
+function toggleMenu() { document.getElementById('mobileMenu').classList.toggle('open'); }
+function scrollTo(id) { var el = document.getElementById(id); if(el) el.scrollIntoView({behavior:'smooth'}); }
+
+function toggleLang() {
+  currentLang = currentLang === 'en' ? 'ur' : 'en';
+  document.querySelector('.lang-toggle').textContent = currentLang === 'en' ? 'اردو' : 'English';
+  document.body.classList.toggle('urdu-mode', currentLang === 'ur');
+  document.querySelectorAll('[data-en]').forEach(function(el) {
+    var val = el.getAttribute('data-' + currentLang);
+    if (val) el.innerHTML = val;
+  });
+  if(currentLang === 'ur') document.documentElement.setAttribute('dir','rtl');
+  else document.documentElement.removeAttribute('dir');
+}
+
+// PRODUCTS
+function loadProducts(filter) {
+  if(!filter) filter = 'all';
+  var grid = document.getElementById('productsGrid');
+  grid.innerHTML = '<div style="text-align:center;padding:60px;color:#6b7280;grid-column:1/-1">Loading products... 🌿</div>';
+  var url = filter === 'all' ? '/products' : '/products?category=' + filter;
+  return apiCall('GET', url).then(function(data) {
+    if (!data.success) throw new Error(data.message);
+    allProducts = data.products;
+    renderProducts(allProducts);
+  }).catch(function(e) {
+    grid.innerHTML = '<div style="text-align:center;padding:60px;color:#e74c3c;grid-column:1/-1">Backend connect nahi hua!<br><small>' + e.message + '</small></div>';
+  });
+}
+
+function renderProducts(products) {
+  var grid = document.getElementById('productsGrid');
+  if (!products.length) { grid.innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#6b7280">No products found.</p>'; return; }
+  var html = '';
+  for(var i=0; i<products.length; i++) {
+    var p = products[i];
+    var emoji = p.emoji || '🌾';
+    var badge = p.badge ? '<div class="pc-badge">' + p.badge + '</div>' : '';
+    var catEn = p.category_en || '';
+    var catUr = p.category_ur || '';
+    var nameUr = p.name_ur || '';
+    var desc = p.description_en || '';
+    var price = parseFloat(p.price).toLocaleString();
+    html += '<div class="product-card">';
+    var imgHtml = p.image_url
+      ? '<img src="' + (window.location.port==='5000'?'':API_URL.replace('/api','')) + p.image_url + '" style="width:100%;height:100%;object-fit:cover;" onerror="this.style.display=\'none\';this.nextSibling.style.display=\'block\'" /><span style="font-size:72px;display:none">' + emoji + '</span>'
+      : '<span style="font-size:72px">' + emoji + '</span>';
+    html += '<div class="pc-img">' + imgHtml + badge + '</div>';
+    html += '<div class="pc-body">';
+    html += '<div class="pc-cat">' + catEn + ' &bull; ' + catUr + '</div>';
+    html += '<div class="pc-name">' + p.name_en + '</div>';
+    html += '<div class="pc-name-ur">' + nameUr + '</div>';
+    html += '<div class="pc-desc">' + desc + '</div>';
+    html += '<div class="pc-footer">';
+    html += '<div class="pc-price">Rs. ' + price + ' <span>/ ' + p.unit + '</span></div>';
+    html += '<button class="pc-btn" onclick="orderProduct(' + p.id + ',this)">Order Now</button>';
+    html += '</div></div></div>';
+  }
+  grid.innerHTML = html;
+  var btns = grid.querySelectorAll('.pc-btn');
+  for(var j=0; j<btns.length; j++) {
+    btns[j]._product = products[j];
+  }
+  var sel = document.getElementById('orderProduct');
+  sel.innerHTML = '<option value="">Select Product / مصنوعہ منتخب کریں</option>';
+  for(var i=0; i<products.length; i++) {
+    var p = products[i];
+    var opt = document.createElement('option');
+    opt.value = p.name_en;
+    opt.textContent = p.name_en + ' — ' + (p.name_ur || '') + ' (Rs. ' + parseFloat(p.price).toLocaleString() + '/' + p.unit + ')';
+    sel.appendChild(opt);
+  }
+  setTimeout(function() {
+    var cards = document.querySelectorAll('.product-card');
+    for(var k=0; k<cards.length; k++) {
+      (function(card, idx) {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(24px)';
+        card.style.transition = 'all 0.4s ease ' + (idx * 0.07) + 's';
+        setTimeout(function() { card.style.opacity='1'; card.style.transform='translateY(0)'; }, 50);
+      })(cards[k], k);
+    }
+  }, 50);
+}
+
+function filterProducts(cat) {
+  document.querySelectorAll('.filter-btn').forEach(function(b){ b.classList.remove('active'); });
+  event.target.classList.add('active');
+  loadProducts(cat);
+}
+
+function orderProduct(id, btn) {
+  var p = btn._product;
+  if(!p) { p = allProducts.find(function(x){ return x.id === id; }); }
+  if(!p) return;
+  window._selProduct = p;
+  var sel = document.getElementById('orderProduct');
+  sel.value = p.name_en;
+  document.getElementById('order').scrollIntoView({behavior:'smooth'});
+  showToast('📦 ' + p.name_en + ' — Rs.' + parseFloat(p.price).toLocaleString() + '/' + p.unit);
+}
+
+// CITIES
+function loadCities() {
+  return apiCall('GET', '/cities').then(function(data) {
+    if (!data.success) return;
+    var sel = document.getElementById('orderCity');
+    sel.innerHTML = '<option value="">Select City / شہر منتخب کریں</option>';
+    for(var i=0; i<data.cities.length; i++) {
+      var c = data.cities[i];
+      var opt = document.createElement('option');
+      opt.value = c.city_name;
+      opt.textContent = c.city_name + ' (Delivery: Rs. ' + c.delivery_fee + ')';
+      sel.appendChild(opt);
+    }
+  }).catch(function(){});
+}
+
+// ===== PLACE ORDER (UPDATED) =====
+function placeOrder() {
+  var name    = document.getElementById('orderName').value.trim();
+  var phone   = document.getElementById('orderPhone').value.trim();
+  var city    = document.getElementById('orderCity').value;
+  var product = document.getElementById('orderProduct').value;
+  var qty     = parseInt(document.getElementById('orderQty').value) || 1;
+  var address = document.getElementById('orderAddress').value.trim();
+  var notes   = document.getElementById('orderNotes').value.trim();
+  var payment = document.getElementById('orderPayment').value;
+
+  if (!name || !phone || !city || !product) {
+    showToast('⚠️ Please fill all required fields!');
+    return;
+  }
+
+  // ✅ NEW: Screenshot validation for online payments
+  if ((payment === 'easypaisa' || payment === 'jazzcash') && !_screenshotDataURL) {
+    showToast('📸 Payment screenshot zaroori hai! Pehle screenshot upload karein.');
+    document.getElementById('uploadArea').style.border = '2px dashed #ef4444';
+    document.getElementById('uploadArea').style.background = '#fef2f2';
+    document.getElementById('paymentInfoBox').scrollIntoView({behavior:'smooth', block:'center'});
+    return;
+  }
+
+  var p = window._selProduct;
+  if(!p) {
+    p = allProducts.find(function(x){ return x.name_en === product; });
+  }
+  if(!p) {
+    showToast('⚠️ Product not found!');
+    return;
+  }
+  var productId    = p.id;
+  var productPrice = parseFloat(p.price);
+  var productUnit  = p.unit;
+
+  var btn = document.getElementById('placeOrderBtn');
+  btn.textContent = 'Processing...'; btn.disabled = true;
+
+  apiCall('POST', '/orders', {
+    customer_name: name, customer_phone: phone,
+    customer_city: city, delivery_address: address,
+    notes: notes, payment_method: payment,
+    customer_id: currentUser ? currentUser.id : null,
+    items: [{product_id: productId, quantity: qty}]
+  }).then(function(data) {
+    if (!data.success) throw new Error(data.message);
+
+    var itemTotal = productPrice * qty;
+    var paymentText = '';
+    if (payment === 'easypaisa') {
+      paymentText = '\n💳 *Payment:* Easypaisa\n📱 Send Rs. ' + data.total_amount + ' to: 0316-7348570\n🏦 Account: KHIZER ABBAS\n\n📸 *Screenshot bhi bhej raha/rahi hoon!*';
+    } else if (payment === 'jazzcash') {
+      paymentText = '\n💳 *Payment:* JazzCash\n📱 Send Rs. ' + data.total_amount + ' to: 0316-7348570\n🏦 Account: KHIZER ABBAS\n\n📸 *Screenshot bhi bhej raha/rahi hoon!*';
+    } else {
+      paymentText = '\n💰 *Payment:* Cash on Delivery';
+    }
+
+    var msg = '🌿 *EarthSweet Order* 🌿\n\n' +
+      '📦 *Product:* ' + product + '\n' +
+      '🔢 *Quantity:* ' + qty + ' ' + productUnit + '\n' +
+      '💰 *Unit Price:* Rs. ' + productPrice.toLocaleString() + '/' + productUnit + '\n' +
+      '🧾 *Item Total:* Rs. ' + itemTotal.toLocaleString() + '\n' +
+      '🚚 *Delivery Fee:* Rs. ' + data.delivery_fee + '\n' +
+      '💵 *Grand Total:* Rs. ' + data.total_amount + paymentText + '\n\n' +
+      '👤 *Name:* ' + name + '\n' +
+      '📱 *Phone:* ' + phone + '\n' +
+      '📍 *City:* ' + city + '\n' +
+      '🏠 *Address:* ' + (address || 'N/A') + '\n' +
+      '📝 *Notes:* ' + (notes || 'None') + '\n\n' +
+      '🆔 *Order ID:* ' + data.order_number;
+
+    // ── STEP A: Admin dashboard ko screenshot + message bhejo ──────────────────
+    // Yeh call backend mein screenshot aur WhatsApp message dono store kar deti hai.
+    // Admin dashboard mein "📸 Screenshot" aur "💬 Message" buttons se admin dekh sakta hai.
+    if (_screenshotDataURL) {
+      apiCall('PATCH', '/orders/' + data.order_number + '/message', {
+        whatsapp_message: msg,           // exact message jo WhatsApp par gaya
+        payment_screenshot: _screenshotDataURL   // base64 image — admin ko direct dikhegi
+      }).catch(function() { /* silent — admin connection fail ho bhi to WhatsApp chal raha hai */ });
+    }
+
+    // ── STEP B: WhatsApp par image + message bhejo ─────────────────────────────
+    // Mobile par: Web Share API — OS share sheet khulta hai, user WhatsApp select kare
+    //             → image + text dono ek saath WhatsApp mein jaate hain (copy/paste ki zaroorat nahi)
+    // Desktop par: WhatsApp URL + image auto-download — user sirf paste kare
+    sendScreenshotToWhatsApp(msg, _screenshotDataURL);
+
+    // ── STEP C: Confirmation modal dikhao ──────────────────────────────────────
+    if ((payment === 'easypaisa' || payment === 'jazzcash') && _screenshotDataURL) {
+      setTimeout(function() {
+        document.getElementById('ssImgPreview').src = _screenshotDataURL;
+        document.getElementById('ssOrderInfo').innerHTML =
+          '✅ Order <strong>#' + data.order_number + '</strong> placed! Grand Total: <strong>Rs. ' + data.total_amount + '</strong>';
+        showModal('screenshotModal');
+      }, 900);
+    }
+
+    showToast('✅ Order #' + data.order_number + ' — Rs. ' + data.total_amount);
+
+    // Reset form
+    ['orderName','orderPhone','orderQty','orderAddress','orderNotes'].forEach(function(id){ document.getElementById(id).value=''; });
+    document.getElementById('orderCity').selectedIndex = 0;
+    document.getElementById('orderProduct').selectedIndex = 0;
+    document.getElementById('orderPayment').value = 'cod';
+    document.getElementById('paymentInfoBox').style.display = 'none';
+    removeScreenshot();
+    window._selProduct = null;
+
+  }).catch(function(e) {
+    showToast('❌ Order failed: ' + e.message);
+  }).finally(function() {
+    btn.textContent = 'Place Order via WhatsApp 📲'; btn.disabled = false;
+  });
+}
+
+// ===== DOWNLOAD SCREENSHOT (NEW) =====
+function downloadScreenshot() {
+  if (!_screenshotDataURL) { showToast('❌ Screenshot not found!'); return; }
+  var a = document.createElement('a');
+  a.href = _screenshotDataURL;
+  a.download = 'EarthSweet-payment-' + Date.now() + '.jpg';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  showToast('✅ Screenshot downloaded!');
+}
+
+// ===== WHATSAPP IMAGE SENDER =====
+// Mobile par: Web Share API se image + text ek saath WhatsApp mein jaata hai.
+//             (bilkul waise jaise gallery se koi photo WhatsApp share karte hain)
+// Desktop par: WhatsApp URL text ke saath khulta hai + image auto-download.
+async function sendScreenshotToWhatsApp(msg, screenshotDataURL) {
+  var waUrl = 'https://wa.me/923167348570?text=' + encodeURIComponent(msg);
+
+  // ── Case 1: No screenshot (COD order) — sirf text message ──────────────────
+  if (!screenshotDataURL) {
+    window.open(waUrl, '_blank');
+    return;
+  }
+
+  // ── Case 2: Mobile browser — Web Share API ──────────────────────────────────
+  // navigator.share() browser ka native feature hai jis se OS ka share sheet
+  // khulta hai. User us mein WhatsApp choose karta hai to image + text dono
+  // ek saath bhejna bilkul usi tarah hota hai jaise gallery se koi image share karte hain.
+  if (navigator.share && navigator.canShare) {
+    try {
+      var fetchRes = await fetch(screenshotDataURL);
+      var blob = await fetchRes.blob();
+      var imgExt = blob.type && blob.type.includes('png') ? 'png' : 'jpg';
+      var imgFile = new File([blob], 'EarthSweet-payment.' + imgExt, { type: blob.type || 'image/jpeg' });
+      var shareData = { text: msg, files: [imgFile] };
+
+      if (navigator.canShare(shareData)) {
+        // ✅ Share sheet khulega — user WhatsApp select kare
+        await navigator.share(shareData);
+        return; // Done — image + text dono WhatsApp gaye
+      }
+    } catch(err) {
+      // AbortError = user ne share sheet close kiya — koi masla nahi, modal show hoga
+      if (err.name === 'AbortError') return;
+      // Kisi aur error par neeche desktop fallback pe jaao
+    }
+  }
+
+  // ── Case 3: Desktop ya unsupported browser — fallback ──────────────────────
+  // WhatsApp text ke saath khulta hai. Screenshot automatically download hoti hai.
+  // Modal mein note dikh jayega ke WhatsApp mein image attach karni hai.
+  window.open(waUrl, '_blank');
+
+  // Desktop fallback note modal mein dikhao
+  var noteEl = document.getElementById('desktopFallbackNote');
+  if (noteEl) noteEl.style.display = 'block';
+
+  // Screenshot auto-download karo taake user asani se WhatsApp mein attach kar sake
+  setTimeout(function() {
+    var a = document.createElement('a');
+    a.href = screenshotDataURL;
+    a.download = 'EarthSweet-payment-' + Date.now() + '.jpg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }, 1200);
+}
+
+// CONTACT
+function sendContact() {
+  var name  = document.getElementById('cName').value.trim();
+  var phone = document.getElementById('cPhone').value.trim();
+  var msg   = document.getElementById('cMsg').value.trim();
+  if (!name || !msg) { showToast('⚠️ Fill name and message!'); return; }
+  apiCall('POST', '/contact', {name:name, phone:phone, message:msg}).then(function() {
+    var waMsg = '💬 *EarthSweet Message*\n\n👤 ' + name + '\n📱 ' + (phone||'N/A') + '\n📝 ' + msg;
+    window.open('https://wa.me/923167348570?text=' + encodeURIComponent(waMsg), '_blank');
+    showToast('✅ Message sent!');
+    ['cName','cPhone','cMsg'].forEach(function(id){ document.getElementById(id).value=''; });
+  }).catch(function(e){ showToast('❌ ' + e.message); });
+}
+
+// AUTH
+function updateNavUser() {
+  var stored = JSON.parse(localStorage.getItem('es_user') || 'null');
+  if (stored) currentUser = stored;
+  var loginBtn = document.querySelector('.btn-login');
+  var logoutBtn = document.getElementById('logoutBtn');
+  if (currentUser) {
+    if (loginBtn) { loginBtn.textContent = currentUser.full_name.split(' ')[0]; loginBtn.onclick = null; }
+    if (logoutBtn) logoutBtn.style.display = 'inline-block';
+  } else {
+    if (loginBtn) { loginBtn.textContent = 'Login'; loginBtn.onclick = function(){ showModal('loginModal'); }; }
+    if (logoutBtn) logoutBtn.style.display = 'none';
+  }
+}
+
+function logoutUser() {
+  currentToken = null; currentUser = null;
+  localStorage.removeItem('es_token');
+  localStorage.removeItem('es_user');
+  if (window.firebaseSignOut) window.firebaseSignOut();
+  updateNavUser();
+  showToast('👋 Logged out successfully!');
+}
+
+function loginUser() {
+  var phone = document.getElementById('loginPhone').value.trim();
+  var pass  = document.getElementById('loginPass').value;
+  if (!phone || !pass) { showToast('⚠️ Fill all fields!'); return; }
+  apiCall('POST', '/auth/login', {phone:phone, password:pass}).then(function(data) {
+    if (!data.success) throw new Error(data.message);
+    currentToken = data.token; currentUser = data.customer;
+    localStorage.setItem('es_token', currentToken);
+    localStorage.setItem('es_user', JSON.stringify(currentUser));
+    closeModal('loginModal'); updateNavUser();
+    showToast('✅ Welcome, ' + currentUser.full_name + '!');
+  }).catch(function(e){ showToast('❌ ' + e.message); });
+}
+
+function registerUser() {
+  var name  = document.getElementById('regName').value.trim();
+  var phone = document.getElementById('regPhone').value.trim();
+  var city  = document.getElementById('regCity').value.trim();
+  var pass  = document.getElementById('regPass').value;
+  if (!name || !phone || !pass) { showToast('⚠️ Fill required fields!'); return; }
+  apiCall('POST', '/auth/register', {full_name:name, phone:phone, city:city, password:pass}).then(function(data) {
+    if (!data.success) throw new Error(data.message);
+    currentToken = data.token; currentUser = data.customer;
+    localStorage.setItem('es_token', currentToken);
+    localStorage.setItem('es_user', JSON.stringify(currentUser));
+    closeModal('registerModal'); updateNavUser();
+    showToast('✅ Account created! Welcome, ' + name + '!');
+  }).catch(function(e){ showToast('❌ ' + e.message); });
+}
+
+// MODALS
+function showModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function switchModal(from, to) { closeModal(from); showModal(to); }
+document.querySelectorAll('.modal-overlay').forEach(function(el) {
+  el.addEventListener('click', function(e) { if (e.target === this) this.classList.remove('open'); });
+});
+
+// PAYMENT INFO TOGGLE
+function togglePaymentInfo() {
+  var val = document.getElementById('orderPayment').value;
+  var box = document.getElementById('paymentInfoBox');
+  var icon = document.getElementById('paymentIcon');
+  var title = document.getElementById('paymentTitle');
+  if (val === 'easypaisa') {
+    box.style.display = 'block';
+    icon.textContent = '📱';
+    title.textContent = 'Easypaisa Account';
+    // Reset border on toggle
+    document.getElementById('uploadArea').style.border = '2px dashed #86efac';
+    document.getElementById('uploadArea').style.background = 'white';
+  } else if (val === 'jazzcash') {
+    box.style.display = 'block';
+    icon.textContent = '📱';
+    title.textContent = 'JazzCash Account';
+    document.getElementById('uploadArea').style.border = '2px dashed #86efac';
+    document.getElementById('uploadArea').style.background = 'white';
+  } else {
+    box.style.display = 'none';
+    // Clear screenshot when switching to COD
+    removeScreenshot();
+  }
+}
+
+// SCREENSHOT PREVIEW (UPDATED — saves to global var)
+function previewScreenshot() {
+  var file = document.getElementById('paymentScreenshot').files[0];
+  if (!file) return;
+  if (file.size > 5 * 1024 * 1024) { showToast('❌ File too large! Max 5MB'); return; }
+  _screenshotFileName = file.name;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    _screenshotDataURL = e.target.result; // ✅ Save globally
+    document.getElementById('previewImg').src = e.target.result;
+    document.getElementById('screenshotPreview').style.display = 'block';
+    document.getElementById('uploadArea').style.display = 'none';
+    // Reset red border if it was set
+    document.getElementById('uploadArea').style.border = '2px dashed #86efac';
+    document.getElementById('uploadArea').style.background = 'white';
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeScreenshot() {
+  _screenshotDataURL = null;
+  var fileInput = document.getElementById('paymentScreenshot');
+  if (fileInput) fileInput.value = '';
+  var preview = document.getElementById('screenshotPreview');
+  var uploadArea = document.getElementById('uploadArea');
+  if (preview) preview.style.display = 'none';
+  if (uploadArea) uploadArea.style.display = 'block';
+}
+
+// TOAST
+function showToast(msg) {
+  var t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); }, 4000);
+}
+
+// SCROLL ANIMATIONS
+var scrollObs = new IntersectionObserver(function(entries) {
+  entries.forEach(function(e) {
+    if (e.isIntersecting) { e.target.style.opacity='1'; e.target.style.transform='translateY(0)'; }
+  });
+}, {threshold: 0.08});
+setTimeout(function() {
+  document.querySelectorAll('.why-card, .t-card').forEach(function(el) {
+    el.style.opacity = '0'; el.style.transform = 'translateY(28px)';
+    el.style.transition = 'all 0.55s cubic-bezier(0.22,1,0.36,1)';
+    scrollObs.observe(el);
+  });
+}, 2000);
+
+
+</script>
+</body>
+</html>

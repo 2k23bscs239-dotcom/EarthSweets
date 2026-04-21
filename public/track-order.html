@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Track Order — EarthSweet</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+  :root {
+    --dark: #1a1a2e;
+    --amber: #e9c46a;
+    --amber-dark: #d4a843;
+    --green: #2d6a4f;
+    --cream: #faf8f0;
+    --gray: #6b7280;
+    --border: rgba(233,196,106,0.2);
+    --card: #ffffff;
+    --shadow: 0 4px 24px rgba(0,0,0,0.08);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; background: var(--cream); color: var(--dark); min-height: 100vh; }
+
+  nav { background: var(--dark); padding: 0 24px; border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; }
+  .nav-inner { max-width: 1100px; margin: 0 auto; display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .nav-logo { font-family: 'Cormorant Garamond', serif; font-size: 1.6rem; font-weight: 700; color: var(--amber); text-decoration: none; display: flex; align-items: center; gap: 8px; }
+  .nav-back { color: rgba(255,255,255,0.7); text-decoration: none; font-size: 0.88rem; display: flex; align-items: center; gap: 6px; border: 1px solid rgba(255,255,255,0.2); padding: 6px 14px; border-radius: 99px; transition: all 0.2s; }
+  .nav-back:hover { border-color: var(--amber); color: var(--amber); }
+
+  .hero { background: var(--dark); padding: 56px 24px 64px; text-align: center; }
+  .hero-tag { display: inline-block; background: rgba(233,196,106,0.15); color: var(--amber); border: 1px solid rgba(233,196,106,0.3); padding: 5px 16px; border-radius: 99px; font-size: 0.78rem; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 20px; }
+  .hero h1 { font-family: 'Cormorant Garamond', serif; font-size: clamp(2rem, 5vw, 3.2rem); font-weight: 700; color: white; margin-bottom: 12px; }
+  .hero p { color: rgba(255,255,255,0.55); font-size: 1rem; max-width: 480px; margin: 0 auto 36px; line-height: 1.7; }
+
+  .search-box { background: white; border-radius: 16px; padding: 8px 8px 8px 20px; display: flex; align-items: center; gap: 8px; max-width: 520px; margin: 0 auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2); }
+  .search-box input { flex: 1; border: none; outline: none; font-size: 1rem; font-family: 'Inter', sans-serif; color: var(--dark); background: transparent; }
+  .search-box input::placeholder { color: #9ca3af; }
+  .search-btn { background: var(--amber); border: none; color: var(--dark); font-weight: 600; font-size: 0.9rem; padding: 10px 22px; border-radius: 10px; cursor: pointer; transition: background 0.2s; white-space: nowrap; font-family: 'Inter', sans-serif; }
+  .search-btn:hover { background: var(--amber-dark); }
+
+  .main { max-width: 800px; margin: 0 auto; padding: 48px 24px 80px; }
+
+  .empty-state { text-align: center; padding: 60px 20px; color: var(--gray); }
+  .empty-icon { font-size: 64px; margin-bottom: 20px; opacity: 0.4; }
+  .empty-state h3 { font-size: 1.2rem; color: var(--dark); margin-bottom: 8px; }
+  .empty-state p { font-size: 0.9rem; line-height: 1.6; }
+
+  .result-card { background: white; border-radius: 20px; box-shadow: var(--shadow); overflow: hidden; display: none; }
+
+  .order-header { background: var(--dark); padding: 28px 32px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; }
+  .order-num { font-family: 'Cormorant Garamond', serif; font-size: 1.5rem; font-weight: 700; color: var(--amber); }
+  .order-date { color: rgba(255,255,255,0.5); font-size: 0.82rem; margin-top: 4px; }
+  .status-badge { padding: 8px 18px; border-radius: 99px; font-size: 0.82rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+  .status-pending    { background: rgba(251,191,36,0.2); color: #fbbf24; border: 1px solid rgba(251,191,36,0.3); }
+  .status-confirmed  { background: rgba(59,130,246,0.2); color: #60a5fa; border: 1px solid rgba(59,130,246,0.3); }
+  .status-processing { background: rgba(168,85,247,0.2); color: #c084fc; border: 1px solid rgba(168,85,247,0.3); }
+  .status-shipped    { background: rgba(251,146,60,0.2); color: #fb923c; border: 1px solid rgba(251,146,60,0.3); }
+  .status-delivered  { background: rgba(34,197,94,0.2); color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+  .status-cancelled  { background: rgba(239,68,68,0.2); color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+
+  .progress-section { padding: 36px 32px; border-bottom: 1px solid #f3f4f6; }
+  .progress-section h3 { font-size: 0.75rem; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 32px; }
+  .steps { display: flex; align-items: flex-start; justify-content: space-between; position: relative; }
+  .steps::before { content: ''; position: absolute; top: 20px; left: 40px; right: 40px; height: 2px; background: #e5e7eb; z-index: 0; }
+  .progress-line { position: absolute; top: 20px; left: 40px; height: 2px; background: var(--green); z-index: 1; transition: width 0.6s ease; }
+  .step { display: flex; flex-direction: column; align-items: center; gap: 10px; flex: 1; position: relative; z-index: 2; }
+  .step-circle { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 16px; border: 2px solid #e5e7eb; background: white; transition: all 0.3s; }
+  .step.done .step-circle { background: var(--green); border-color: var(--green); color: white; }
+  .step.active .step-circle { background: white; border-color: var(--green); color: var(--green); box-shadow: 0 0 0 4px rgba(45,106,79,0.15); }
+  .step.pending .step-circle { background: white; border-color: #e5e7eb; color: #d1d5db; }
+  .step-label { font-size: 0.72rem; font-weight: 500; color: var(--gray); text-align: center; max-width: 70px; line-height: 1.3; }
+  .step.done .step-label, .step.active .step-label { color: var(--dark); font-weight: 600; }
+  .step-time { font-size: 0.65rem; color: #9ca3af; text-align: center; }
+
+  /* ===== MAP SECTION ===== */
+  .map-section { padding: 28px 32px; border-bottom: 1px solid #f3f4f6; }
+  .map-section h3 { font-size: 0.75rem; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; }
+  .map-route-info { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; font-size: 0.88rem; }
+  .map-city { background: var(--green); color: white; padding: 5px 14px; border-radius: 99px; font-weight: 600; font-size: 0.82rem; }
+  .map-city.destination { background: var(--amber); color: var(--dark); }
+  .map-city.current { background: #fb923c; color: white; animation: pulse-city 1.5s ease-in-out infinite; }
+  @keyframes pulse-city { 0%,100%{opacity:1} 50%{opacity:0.7} }
+  .map-arrow { color: var(--gray); font-size: 1.1rem; }
+  #deliveryMap { height: 280px; border-radius: 12px; overflow: hidden; border: 1px solid #e5e7eb; }
+  .map-status-bar { display: flex; align-items: center; gap: 8px; margin-top: 12px; font-size: 0.82rem; color: var(--gray); }
+  .map-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .map-dot.origin { background: var(--green); }
+  .map-dot.dest { background: var(--amber-dark); }
+  .map-dot.truck { background: #fb923c; }
+
+  .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0; }
+  .info-block { padding: 24px 32px; border-bottom: 1px solid #f3f4f6; }
+  .info-block:nth-child(odd) { border-right: 1px solid #f3f4f6; }
+  .info-label { font-size: 0.72rem; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px; }
+  .info-value { font-size: 0.95rem; color: var(--dark); font-weight: 500; line-height: 1.5; }
+
+  .items-section { padding: 24px 32px; border-bottom: 1px solid #f3f4f6; }
+  .items-section h3 { font-size: 0.75rem; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; }
+  .item-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #f9fafb; }
+  .item-row:last-child { border-bottom: none; }
+  .item-name { font-size: 0.9rem; font-weight: 500; color: var(--dark); }
+  .item-qty { font-size: 0.8rem; color: var(--gray); margin-top: 2px; }
+  .item-price { font-size: 0.95rem; font-weight: 600; color: var(--green); }
+
+  .totals { padding: 20px 32px 28px; }
+  .total-row { display: flex; justify-content: space-between; font-size: 0.88rem; color: var(--gray); margin-bottom: 8px; }
+  .total-row.final { font-size: 1.05rem; font-weight: 700; color: var(--dark); margin-top: 12px; padding-top: 12px; border-top: 2px solid var(--dark); }
+
+  .whatsapp-btn { display: flex; align-items: center; justify-content: center; gap: 8px; background: #25d366; color: white; font-weight: 600; font-size: 0.95rem; padding: 14px 24px; border-radius: 12px; text-decoration: none; margin: 0 32px 28px; transition: background 0.2s; }
+  .whatsapp-btn:hover { background: #20b858; }
+
+  .error-msg { background: #fef2f2; border: 1px solid #fecaca; color: #dc2626; padding: 14px 20px; border-radius: 12px; font-size: 0.9rem; margin-top: 20px; text-align: center; display: none; }
+
+  .loading { text-align: center; padding: 40px; color: var(--gray); display: none; }
+  .spinner { width: 36px; height: 36px; border: 3px solid #e5e7eb; border-top-color: var(--green); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  @media (max-width: 560px) {
+    .order-header { padding: 20px; }
+    .progress-section, .map-section, .info-block, .items-section, .totals { padding-left: 20px; padding-right: 20px; }
+    .info-grid { grid-template-columns: 1fr; }
+    .info-block:nth-child(odd) { border-right: none; }
+    .whatsapp-btn { margin-left: 20px; margin-right: 20px; }
+    .step-label { font-size: 0.65rem; }
+    #deliveryMap { height: 220px; }
+  }
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-inner">
+    <a href="index.html" class="nav-logo">🌿 EarthSweet</a>
+    <a href="index.html" class="nav-back">&#8592; Back to Store</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-tag">📦 Order Tracking</div>
+  <h1>Track Your Order</h1>
+  <p>Enter your order number to see real-time status and delivery updates.</p>
+  <div class="search-box">
+    <input type="text" id="orderInput" placeholder="e.g. ES-20240115-1234" autocomplete="off" />
+    <button class="search-btn" onclick="trackOrder()">Track Order</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="loading" id="loading">
+    <div class="spinner"></div>
+    <p>Tracking your order...</p>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="empty-state" id="emptyState">
+    <div class="empty-icon">📦</div>
+    <h3>Enter your order number above</h3>
+    <p>You received your order number via SMS or WhatsApp when you placed the order. It starts with <strong>ES-</strong></p>
+  </div>
+
+  <div class="result-card" id="resultCard">
+
+    <div class="order-header">
+      <div>
+        <div class="order-num" id="resOrderNum"></div>
+        <div class="order-date" id="resDate"></div>
+      </div>
+      <div class="status-badge" id="resBadge"></div>
+    </div>
+
+    <div class="progress-section">
+      <h3>Delivery Progress</h3>
+      <div class="steps" id="stepsContainer">
+        <div class="progress-line" id="progressLine"></div>
+        <div class="step" id="step-pending">
+          <div class="step-circle">📋</div>
+          <div class="step-label">Order Placed</div>
+          <div class="step-time" id="time-pending"></div>
+        </div>
+        <div class="step" id="step-confirmed">
+          <div class="step-circle">✅</div>
+          <div class="step-label">Confirmed</div>
+          <div class="step-time" id="time-confirmed"></div>
+        </div>
+        <div class="step" id="step-processing">
+          <div class="step-circle">⚙️</div>
+          <div class="step-label">Processing</div>
+          <div class="step-time" id="time-processing"></div>
+        </div>
+        <div class="step" id="step-shipped">
+          <div class="step-circle">🚚</div>
+          <div class="step-label">Shipped</div>
+          <div class="step-time" id="time-shipped"></div>
+        </div>
+        <div class="step" id="step-delivered">
+          <div class="step-circle">🏠</div>
+          <div class="step-label">Delivered</div>
+          <div class="step-time" id="time-delivered"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CITY MAP SECTION -->
+    <div class="map-section">
+      <h3>📍 Delivery Route</h3>
+      <div class="map-route-info" id="mapRouteInfo"></div>
+      <div id="deliveryMap"></div>
+      <div class="map-status-bar">
+        <span class="map-dot origin"></span> Origin: Multan &nbsp;|&nbsp;
+        <span class="map-dot dest"></span> Destination &nbsp;|&nbsp;
+        <span class="map-dot truck"></span> Current Location
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-block">
+        <div class="info-label">Customer Name</div>
+        <div class="info-value" id="resName"></div>
+      </div>
+      <div class="info-block">
+        <div class="info-label">City</div>
+        <div class="info-value" id="resCity"></div>
+      </div>
+      <div class="info-block">
+        <div class="info-label">Payment Method</div>
+        <div class="info-value" id="resPayment"></div>
+      </div>
+      <div class="info-block">
+        <div class="info-label">Payment Status</div>
+        <div class="info-value" id="resPayStatus"></div>
+      </div>
+    </div>
+
+    <div class="items-section">
+      <h3>Order Items</h3>
+      <div id="resItems"></div>
+    </div>
+
+    <div class="totals">
+      <div class="total-row"><span>Subtotal</span><span id="resSubtotal"></span></div>
+      <div class="total-row"><span>Delivery Fee</span><span id="resDelivery"></span></div>
+      <div class="total-row final"><span>Total Amount</span><span id="resTotal"></span></div>
+    </div>
+
+    <a href="#" class="whatsapp-btn" id="resWhatsapp" target="_blank">
+      💬 &nbsp;Need help? Chat on WhatsApp
+    </a>
+
+  </div>
+</div>
+
+<script>
+var API = window.location.port === '5000' ? '/api' : 'http://localhost:5000/api';
+var WHATSAPP = '923167348570';
+
+// Pakistan city coordinates
+var CITIES = {
+  'multan':      [30.1575, 71.5249],
+  'lahore':      [31.5204, 74.3587],
+  'karachi':     [24.8607, 67.0011],
+  'islamabad':   [33.6844, 73.0479],
+  'rawalpindi':  [33.5651, 73.0169],
+  'faisalabad':  [31.4504, 73.1350],
+  'peshawar':    [34.0151, 71.5249],
+  'quetta':      [30.1798, 66.9750],
+  'sialkot':     [32.4945, 74.5229],
+  'gujranwala':  [32.1877, 74.1945],
+  'hyderabad':   [25.3960, 68.3578],
+  'sargodha':    [32.0836, 72.6711],
+  'bahawalpur':  [29.3956, 71.6836],
+  'sukkur':      [27.7052, 68.8574],
+  'larkana':     [27.5570, 68.2247],
+  'sheikhupura': [31.7167, 73.9850],
+  'rahim yar khan': [28.4212, 70.2957],
+  'jhang':       [31.2681, 72.3181],
+  'dera ghazi khan': [30.0500, 70.6333],
+  'gujrat':      [32.5736, 74.0790],
+  'sahiwal':     [30.6706, 73.1064],
+  'wah':         [33.7667, 72.7167],
+  'mardan':      [34.1980, 72.0440],
+  'mingora':     [34.7717, 72.3600],
+  'okara':       [30.8138, 73.4534],
+  'chiniot':     [31.7197, 72.9783],
+  'kasur':       [31.1167, 74.4500],
+  'vehari':      [29.5100, 72.3500],
+  'attock':      [33.7667, 72.3500],
+  'mianwali':    [32.5856, 71.5430],
+};
+
+var mapInstance = null;
+
+document.getElementById('orderInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') trackOrder();
+});
+
+var params = new URLSearchParams(window.location.search);
+if (params.get('order')) {
+  document.getElementById('orderInput').value = params.get('order');
+  trackOrder();
+}
+
+function trackOrder() {
+  var num = document.getElementById('orderInput').value.trim().toUpperCase();
+  if (!num) { showError('Please enter an order number.'); return; }
+
+  hide('emptyState'); hide('resultCard'); hide('errorMsg');
+  show('loading');
+
+  fetch(API + '/orders/' + num)
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      hide('loading');
+      if (!data.success) { showError('Order not found. Please check the order number and try again.'); return; }
+      renderOrder(data.order);
+    })
+    .catch(function() {
+      hide('loading');
+      showError('Cannot connect to server. Please make sure the backend is running.');
+    });
+}
+
+function renderOrder(o) {
+  document.getElementById('resOrderNum').textContent = o.order_number;
+  document.getElementById('resDate').textContent = 'Placed on ' + fmtDate(o.created_at);
+  document.getElementById('resName').textContent = o.customer_name;
+  document.getElementById('resCity').textContent = o.customer_city;
+  document.getElementById('resPayment').textContent = fmtPayment(o.payment_method);
+  document.getElementById('resPayStatus').textContent = o.payment_status === 'paid' ? '✅ Paid' : o.payment_status === 'refunded' ? '↩️ Refunded' : '⏳ Unpaid (COD)';
+
+  var badge = document.getElementById('resBadge');
+  badge.textContent = o.status.charAt(0).toUpperCase() + o.status.slice(1);
+  badge.className = 'status-badge status-' + o.status;
+
+  renderSteps(o);
+  renderMap(o);
+
+  var itemsHtml = '';
+  (o.items || []).forEach(function(item) {
+    itemsHtml += '<div class="item-row">';
+    itemsHtml += '<div><div class="item-name">' + item.product_name + '</div><div class="item-qty">Qty: ' + item.quantity + ' ' + item.product_unit + ' &times; Rs. ' + fmt(item.unit_price) + '</div></div>';
+    itemsHtml += '<div class="item-price">Rs. ' + fmt(item.total_price) + '</div>';
+    itemsHtml += '</div>';
+  });
+  document.getElementById('resItems').innerHTML = itemsHtml || '<p style="color:#9ca3af;font-size:0.88rem">No items found.</p>';
+
+  document.getElementById('resSubtotal').textContent = 'Rs. ' + fmt(o.subtotal || (parseFloat(o.total_amount) - parseFloat(o.delivery_fee || 0)));
+  document.getElementById('resDelivery').textContent = parseFloat(o.delivery_fee) === 0 ? '🎉 Free' : 'Rs. ' + fmt(o.delivery_fee);
+  document.getElementById('resTotal').textContent = 'Rs. ' + fmt(o.total_amount);
+
+  document.getElementById('resWhatsapp').href = 'https://wa.me/' + WHATSAPP + '?text=Hi!%20I%20want%20to%20inquire%20about%20my%20order:%20' + o.order_number;
+
+  show('resultCard');
+}
+
+function renderMap(o) {
+  var originCity = 'multan';
+  var originCoords = CITIES[originCity];
+  var destCityKey = (o.customer_city || '').toLowerCase().trim();
+  var destCoords = CITIES[destCityKey] || null;
+
+  // Route info bar
+  var routeHtml = '<span class="map-city">📍 Multan (Origin)</span>';
+  routeHtml += '<span class="map-arrow">→</span>';
+
+  var statusOrder = ['pending','confirmed','processing','shipped','delivered'];
+  var currentIdx = statusOrder.indexOf(o.status);
+
+  // Current location based on status
+  var currentCoords = originCoords;
+  var currentLabel = 'Multan';
+
+  if (o.status === 'delivered' && destCoords) {
+    currentCoords = destCoords;
+    currentLabel = o.customer_city;
+  } else if (o.status === 'shipped' && destCoords) {
+    // Midpoint between origin and destination
+    currentCoords = [
+      (originCoords[0] + destCoords[0]) / 2,
+      (originCoords[1] + destCoords[1]) / 2
+    ];
+    currentLabel = 'In Transit';
+  }
+
+  if (destCoords) {
+    routeHtml += '<span class="map-city current">🚚 ' + currentLabel + '</span>';
+    routeHtml += '<span class="map-arrow">→</span>';
+    routeHtml += '<span class="map-city destination">🏠 ' + o.customer_city + '</span>';
+  } else {
+    routeHtml += '<span class="map-city destination">🏠 ' + (o.customer_city || 'Destination') + '</span>';
+  }
+  document.getElementById('mapRouteInfo').innerHTML = routeHtml;
+
+  // Init or reset map
+  if (mapInstance) {
+    mapInstance.remove();
+    mapInstance = null;
+  }
+
+  var mapCenter = destCoords
+    ? [(originCoords[0] + destCoords[0]) / 2, (originCoords[1] + destCoords[1]) / 2]
+    : [30.5, 71.5];
+  var zoom = destCoords ? 6 : 6;
+
+  mapInstance = L.map('deliveryMap', { zoomControl: true, scrollWheelZoom: false }).setView(mapCenter, zoom);
+
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap'
+  }).addTo(mapInstance);
+
+  // Origin marker (green)
+  var greenIcon = L.divIcon({
+    html: '<div style="background:#2d6a4f;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3)"></div>',
+    iconSize: [18, 18], iconAnchor: [9, 9], className: ''
+  });
+  L.marker(originCoords, {icon: greenIcon}).addTo(mapInstance)
+    .bindPopup('<b>📦 Origin</b><br>Multan, Punjab<br><small>EarthSweet Warehouse</small>');
+
+  if (destCoords) {
+    // Destination marker (amber)
+    var amberIcon = L.divIcon({
+      html: '<div style="background:#e9c46a;width:18px;height:18px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.3)"></div>',
+      iconSize: [18, 18], iconAnchor: [9, 9], className: ''
+    });
+    L.marker(destCoords, {icon: amberIcon}).addTo(mapInstance)
+      .bindPopup('<b>🏠 Destination</b><br>' + o.customer_city);
+
+    // Route line
+    var routeColor = o.status === 'delivered' ? '#2d6a4f' : '#fb923c';
+    L.polyline([originCoords, destCoords], {
+      color: routeColor, weight: 3, opacity: 0.7,
+      dashArray: o.status === 'delivered' ? null : '8,6'
+    }).addTo(mapInstance);
+
+    // Truck/current marker (orange) - only if not delivered or pending
+    if (o.status !== 'pending' && o.status !== 'confirmed' && o.status !== 'delivered') {
+      var truckIcon = L.divIcon({
+        html: '<div style="background:#fb923c;width:26px;height:26px;border-radius:50%;border:3px solid white;box-shadow:0 2px 12px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;font-size:13px">🚚</div>',
+        iconSize: [26, 26], iconAnchor: [13, 13], className: ''
+      });
+      L.marker(currentCoords, {icon: truckIcon}).addTo(mapInstance)
+        .bindPopup('<b>🚚 Current Location</b><br>' + currentLabel)
+        .openPopup();
+    }
+
+    // Fit map to show both cities
+    mapInstance.fitBounds([originCoords, destCoords], {padding: [40, 40]});
+  }
+}
+
+function renderSteps(o) {
+  var statusOrder = ['pending', 'confirmed', 'processing', 'shipped', 'delivered'];
+  var currentIdx = statusOrder.indexOf(o.status);
+  if (o.status === 'cancelled') currentIdx = -1;
+
+  var times = {
+    pending:   o.created_at,
+    confirmed: o.confirmed_at,
+    shipped:   o.shipped_at,
+    delivered: o.delivered_at
+  };
+
+  statusOrder.forEach(function(s, i) {
+    var el = document.getElementById('step-' + s);
+    var timeEl = document.getElementById('time-' + s);
+    if (!el) return;
+    el.className = 'step';
+    if (currentIdx < 0) {
+      el.classList.add('pending');
+    } else if (i < currentIdx) {
+      el.classList.add('done');
+    } else if (i === currentIdx) {
+      el.classList.add('active');
+    } else {
+      el.classList.add('pending');
+    }
+    if (timeEl && times[s]) timeEl.textContent = fmtShortDate(times[s]);
+  });
+
+  var line = document.getElementById('progressLine');
+  if (o.status === 'cancelled') {
+    line.style.width = '0%';
+  } else {
+    var pct = [0, 25, 50, 75, 100];
+    line.style.width = (pct[currentIdx] || 0) + '%';
+  }
+}
+
+function fmtDate(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('en-PK', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+function fmtShortDate(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('en-PK', { day: 'numeric', month: 'short' });
+}
+function fmt(n) { return parseFloat(n).toLocaleString('en-PK'); }
+function fmtPayment(m) {
+  var map = { cod: 'Cash on Delivery', easypaisa: 'Easypaisa', jazzcash: 'JazzCash', bank_transfer: 'Bank Transfer' };
+  return map[m] || m;
+}
+function showError(msg) {
+  var el = document.getElementById('errorMsg');
+  el.textContent = msg; el.style.display = 'block';
+  show('emptyState');
+}
+function show(id) { document.getElementById(id).style.display = 'block'; }
+function hide(id) { document.getElementById(id).style.display = 'none'; }
+</script>
+</body>
+</html>
