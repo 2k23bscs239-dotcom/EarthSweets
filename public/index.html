@@ -1328,7 +1328,9 @@ body.urdu-mode [data-ur] { direction: rtl; }
 <div id="toast" class="toast"></div>
 
 <script>
-var API_URL = window.location.port === '5000' ? '/api' : 'http://localhost:5000/api';
+var API_URL = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' 
+  ? '/api' 
+  : 'https://earthsweets-production.up.railway.app/api';
 var currentUser = JSON.parse(localStorage.getItem('es_user') || 'null');
 var currentToken = localStorage.getItem('es_token') || null;
 var allProducts = [];
