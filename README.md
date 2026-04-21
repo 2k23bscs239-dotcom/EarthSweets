@@ -1,1 +1,1 @@
-# EarthSweets
+# EarthSweet
