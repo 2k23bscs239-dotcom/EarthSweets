@@ -29,7 +29,7 @@
 <!-- Firebase SDK -->
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-  import { getAuth, signInWithPopup, GoogleAuthProvider, FacebookAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
+  import { getAuth, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, FacebookAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
 
   const firebaseConfig = {
     apiKey: "AIzaSyCYN7KXzJTCHUMQGUccnm88WHz4epDbWjk",
@@ -82,30 +82,38 @@
     setTimeout(() => { if (window.updateNavUser) window.updateNavUser(); }, 400);
   });
 
+  // Handle redirect result (for Railway/non-localhost)
+  getRedirectResult(auth).then((result) => {
+    if (result && result.user) handleUser(result.user);
+  }).catch((e) => { console.warn('Redirect result:', e.code); });
+
+  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+
   window.signInWithGoogle = async function() {
     try {
-      const result = await signInWithPopup(auth, googleProvider);
-      handleUser(result.user);
+      if (isLocal) {
+        const result = await signInWithPopup(auth, googleProvider);
+        handleUser(result.user);
+      } else {
+        await signInWithRedirect(auth, googleProvider);
+      }
     } catch(e) {
-      if (e.code === 'auth/popup-blocked') {
-        const t = document.getElementById('toast');
-        if (t) { t.textContent = '⚠️ Popup blocked! Browser settings mein allow karo.'; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),5000); }
-      } else if (e.code !== 'auth/popup-closed-by-user') {
+      if (e.code !== 'auth/popup-closed-by-user') {
         console.error('Google login error:', e.code, e.message);
-        const t = document.getElementById('toast');
-        if (t) { t.textContent = '❌ ' + e.message; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),5000); }
       }
     }
   };
 
   window.signInWithFacebook = async function() {
     try {
-      const result = await signInWithPopup(auth, facebookProvider);
-      handleUser(result.user);
-    } catch(e) {
-      if (e.code !== 'auth/popup-closed-by-user') {
-        console.error('Facebook login error:', e.code, e.message);
+      if (isLocal) {
+        const result = await signInWithPopup(auth, facebookProvider);
+        handleUser(result.user);
+      } else {
+        await signInWithRedirect(auth, facebookProvider);
       }
+    } catch(e) {
+      if (e.code !== 'auth/popup-closed-by-user') console.error('Facebook login error:', e.code);
     }
   };
 
