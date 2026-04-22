@@ -82,11 +82,19 @@
     setTimeout(() => { if (window.updateNavUser) window.updateNavUser(); }, 400);
   });
 
-  // Restore session + handle redirect result via onAuthStateChanged
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      handleUser(user);
+  // ✅ REQUIRED: Complete the redirect sign-in after Google redirects back
+  getRedirectResult(auth).then((result) => {
+    if (result && result.user) {
+      console.log('Redirect login success:', result.user.email);
+      handleUser(result.user);
     }
+  }).catch((e) => {
+    console.warn('Redirect result error:', e.code, e.message);
+  });
+
+  // Restore session on every page load
+  onAuthStateChanged(auth, (user) => {
+    if (user) handleUser(user);
     setTimeout(() => { if (window.updateNavUser) window.updateNavUser(); }, 400);
   });
 
