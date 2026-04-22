@@ -82,39 +82,22 @@
     setTimeout(() => { if (window.updateNavUser) window.updateNavUser(); }, 400);
   });
 
-  // Handle redirect result (for Railway/non-localhost)
-  getRedirectResult(auth).then((result) => {
-    if (result && result.user) handleUser(result.user);
-  }).catch((e) => { console.warn('Redirect result:', e.code); });
-
-  const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+  // Restore session + handle redirect result via onAuthStateChanged
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      handleUser(user);
+    }
+    setTimeout(() => { if (window.updateNavUser) window.updateNavUser(); }, 400);
+  });
 
   window.signInWithGoogle = async function() {
-    try {
-      if (isLocal) {
-        const result = await signInWithPopup(auth, googleProvider);
-        handleUser(result.user);
-      } else {
-        await signInWithRedirect(auth, googleProvider);
-      }
-    } catch(e) {
-      if (e.code !== 'auth/popup-closed-by-user') {
-        console.error('Google login error:', e.code, e.message);
-      }
-    }
+    try { await signInWithRedirect(auth, googleProvider); }
+    catch(e) { console.error('Google error:', e.code); }
   };
 
   window.signInWithFacebook = async function() {
-    try {
-      if (isLocal) {
-        const result = await signInWithPopup(auth, facebookProvider);
-        handleUser(result.user);
-      } else {
-        await signInWithRedirect(auth, facebookProvider);
-      }
-    } catch(e) {
-      if (e.code !== 'auth/popup-closed-by-user') console.error('Facebook login error:', e.code);
-    }
+    try { await signInWithRedirect(auth, facebookProvider); }
+    catch(e) { console.error('Facebook error:', e.code); }
   };
 
   window.firebaseSignOut = async function() {
