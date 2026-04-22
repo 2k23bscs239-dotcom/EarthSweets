@@ -82,30 +82,48 @@
     setTimeout(() => { if (window.updateNavUser) window.updateNavUser(); }, 400);
   });
 
-  // ✅ REQUIRED: Complete the redirect sign-in after Google redirects back
+  // ✅ After redirect back from Google (for Railway)
   getRedirectResult(auth).then((result) => {
-    if (result && result.user) {
-      console.log('Redirect login success:', result.user.email);
-      handleUser(result.user);
-    }
-  }).catch((e) => {
-    console.warn('Redirect result error:', e.code, e.message);
-  });
+    if (result && result.user) handleUser(result.user);
+  }).catch((e) => { console.warn('Redirect:', e.code); });
 
-  // Restore session on every page load
   onAuthStateChanged(auth, (user) => {
     if (user) handleUser(user);
     setTimeout(() => { if (window.updateNavUser) window.updateNavUser(); }, 400);
   });
 
+  // ✅ Popup for Firebase domains, Redirect for Railway
+  const isFirebaseDomain = location.hostname.includes('web.app') ||
+                            location.hostname.includes('firebaseapp.com') ||
+                            location.hostname === 'localhost' ||
+                            location.hostname === '127.0.0.1';
+
   window.signInWithGoogle = async function() {
-    try { await signInWithRedirect(auth, googleProvider); }
-    catch(e) { console.error('Google error:', e.code); }
+    try {
+      if (isFirebaseDomain) {
+        const result = await signInWithPopup(auth, googleProvider);
+        handleUser(result.user);
+      } else {
+        await signInWithRedirect(auth, googleProvider);
+      }
+    } catch(e) {
+      if (e.code !== 'auth/popup-closed-by-user')
+        console.error('Google error:', e.code, e.message);
+    }
   };
 
   window.signInWithFacebook = async function() {
-    try { await signInWithRedirect(auth, facebookProvider); }
-    catch(e) { console.error('Facebook error:', e.code); }
+    try {
+      if (isFirebaseDomain) {
+        const result = await signInWithPopup(auth, facebookProvider);
+        handleUser(result.user);
+      } else {
+        await signInWithRedirect(auth, facebookProvider);
+      }
+    } catch(e) {
+      if (e.code !== 'auth/popup-closed-by-user')
+        console.error('Facebook error:', e.code);
+    }
   };
 
   window.firebaseSignOut = async function() {
